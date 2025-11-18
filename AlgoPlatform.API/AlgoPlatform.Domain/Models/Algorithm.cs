@@ -6,9 +6,10 @@ using System.Threading.Tasks;
 
 namespace AlgoPlatform.Domain.Models
 {
-    public class Algoritm
+    public class Algorithm
     {
-        public string? Name { get; set; }
+        public int Id { get; set; }
+        public string Name { get; set; } = null!;
         public string? Description { get; set; }
     }
 }
