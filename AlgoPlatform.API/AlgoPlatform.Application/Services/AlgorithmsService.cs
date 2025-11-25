@@ -1,7 +1,6 @@
 ﻿using AlgoPlatform.Application.Abstractions;
 using AlgoPlatform.Application.Interfaces;
 using AlgoPlatform.Domain.Models;
-using MediatR;
 namespace AlgoPlatform.Application.Services
 {
     public class AlgorithmsService : IAlgorithmsService

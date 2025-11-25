@@ -1,4 +1,5 @@
-﻿using AlgoPlatform.Application.Interfaces;
+﻿using AlgoPlatform.Application.Abstractions;
+using AlgoPlatform.Application.Interfaces;
 using AlgoPlatform.Application.Services;
 using Microsoft.Extensions.DependencyInjection;
 namespace AlgoPlatform.Application
@@ -8,6 +9,8 @@ namespace AlgoPlatform.Application
         public static IServiceCollection AddApplication(this IServiceCollection services)
         {
             services.AddScoped<IAlgorithmsService, AlgorithmsService>();
+            services.AddScoped<ISubmissionsService, SubmissionsService>();
+
             return services;
         }
     }

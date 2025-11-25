@@ -1,4 +1,4 @@
-﻿using AlgoPlatform.Application.DTO;
+﻿using AlgoPlatform.Application.Request;
 using AlgoPlatform.Application.Interfaces;
 using AlgoPlatform.Application.Services;
 using AlgoPlatform.Domain.Models;
@@ -28,13 +28,6 @@ namespace AlgoPlatform.Controllers
         {
             Algorithm? names = await _algorithmService.GetAlgorithmByIdAsync(id);
             return Ok(names);
-        }
-        [HttpPost]
-        public async Task<ActionResult> SubmitCode([FromBody] SubmitCodeDTO dto)
-        {
-            //var submissionId = await _mediator.Send(new SubmitCodeCommand(dto));
-            //return Accepted(new { submissionId });
-            return Ok();
         }
     }
 }

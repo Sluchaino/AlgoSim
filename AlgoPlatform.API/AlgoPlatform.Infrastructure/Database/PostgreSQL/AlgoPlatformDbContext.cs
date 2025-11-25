@@ -12,6 +12,7 @@ namespace AlgoPlatform.Infrastructure.Database.PostgreSQL
 
         // лучше сразу инициализировать, чтобы не ругался на null
         public DbSet<Algorithm> Algorithms { get; set; } = null!;
+        public DbSet<Submission> Submissions { get; set; } = null!;
 
         protected override void OnModelCreating(ModelBuilder modelBuilder)
         {

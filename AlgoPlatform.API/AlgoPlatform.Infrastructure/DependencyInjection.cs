@@ -15,6 +15,8 @@ namespace AlgoPlatform.Infrastructure
 
             // Репозитории
             services.AddScoped<IAlgorithmsRepository, AlgorithmsRepository>();
+            services.AddScoped<ISubmissionRepository, SubmissionRepository>();
+            services.AddScoped<IUnitOfWork, EfUnitOfWork>();
 
             return services;
         }
