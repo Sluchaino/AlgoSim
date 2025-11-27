@@ -3,12 +3,17 @@
     image: postgres:16-alpine
     environment:
       POSTGRES_USER: algoplatform
-      POSTGRES_PASSWORD: algopass
-      POSTGRES_DB: algoplatform
+      POSTGRES_PASSWORD: 777buba777
+      POSTGRES_DB: AlgoPlatform
     ports:
       - "5432:5432"
     volumes:
       - pgdata:/var/lib/postgresql/data
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U $$POSTGRES_USER -d $$POSTGRES_DB || exit 1"]
+      interval: 5s
+      timeout: 3s
+      retries: 20
 
   redis:
     image: redis:7-alpine
@@ -21,22 +26,19 @@
   api:
     build:
       context: .
-      dockerfile: ./AlgoPlatform.API/Dockerfile
+      dockerfile: ./Dockerfile   # Dockerfile у тебя в корне решения
     environment:
       ASPNETCORE_ENVIRONMENT: Development
       ASPNETCORE_URLS: http://0.0.0.0:5280
-
-      # строка подключения к БД (ИМЕННО так—через ConnectionStrings__DefaultConnection,
-      # потому что в Program.cs ты читаешь DefaultConnection)
-      ConnectionStrings__DefaultConnection: Host=postgres;Username=postgres;Password=777buba777;Database=AlgoPlatform
-
-      # redis для быстрых статусов/кеша
+      ConnectionStrings__DefaultConnection: Host=postgres;Username=algoplatform;Password=777buba777;Database=AlgoPlatform
       Redis__Connection: redis:6379,password=devpass,abortConnect=false
     ports:
       - "5280:5280"
     depends_on:
-      - postgres
-      - redis
+      postgres:
+        condition: service_healthy
+      redis:
+        condition: service_started
 
 volumes:
   pgdata:

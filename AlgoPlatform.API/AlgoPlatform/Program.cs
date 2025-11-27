@@ -6,7 +6,6 @@ using Microsoft.EntityFrameworkCore;
 var builder = WebApplication.CreateBuilder(args);
 
 // Add services to the container.
-builder.Services.AddDbContext<AlgoPlatformDbContext>(opt => opt.UseNpgsql(builder.Configuration.GetConnectionString("DefaultConnection")));
 builder.Services.AddControllers();
 
 builder.Services
@@ -20,18 +19,26 @@ builder.Services.AddSwaggerGen();
 
 var app = builder.Build();
 
-try
+var logger = app.Services.GetRequiredService<ILogger<Program>>();
+var attempts = 0;
+var maxAttempts = 10;
+
+while (true)
 {
-    using var scope = app.Services.CreateScope();
-    var db = scope.ServiceProvider.GetRequiredService<AlgoPlatformDbContext>();
-    await db.Database.MigrateAsync(); // можно Migrate(), но Async ок в top-level
-}
-catch (Exception ex)
-{
-    // необязательно: логирование и фолбэк
-    var logger = app.Services.GetRequiredService<ILogger<Program>>();
-    logger.LogError(ex, "EF Core миграция не прошла");
-    throw; // или решай сам: можно не падать в Dev
+    try
+    {
+        using var scope = app.Services.CreateScope();
+        var db = scope.ServiceProvider.GetRequiredService<AlgoPlatformDbContext>();
+        await db.Database.MigrateAsync();
+        break; // успех
+    }
+    catch (Exception ex)
+    {
+        attempts++;
+        logger.LogWarning(ex, "DB not ready yet (attempt {Attempt}/{Max}).", attempts, maxAttempts);
+        if (attempts >= maxAttempts) throw;
+        await Task.Delay(TimeSpan.FromSeconds(3));
+    }
 }
 
 // Configure the HTTP request pipeline.
