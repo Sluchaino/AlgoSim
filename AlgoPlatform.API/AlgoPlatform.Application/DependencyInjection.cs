@@ -1,7 +1,7 @@
-﻿using AlgoPlatform.Application.Abstractions;
-using AlgoPlatform.Application.Interfaces;
+﻿using AlgoPlatform.Application.Interfaces;
 using AlgoPlatform.Application.Services;
 using Microsoft.Extensions.DependencyInjection;
+
 namespace AlgoPlatform.Application
 {
     public static class DependencyInjection

@@ -14,13 +14,13 @@ namespace AlgoPlatform.Infrastructure.Database.PostgreSQL.Repositories
 
         public async Task<Algorithm?> GetAlgorithmByIdAsync(int id)
         {
-            Algorithm? algorithm = await _db.Algorithms.FindAsync(id);
+            Algorithm? algorithm = await _db.Algorithms.AsNoTracking().Where(p => p.Id == id).FirstOrDefaultAsync();
             return algorithm;
         }
 
         public async Task<IReadOnlyList<string>> GetAllAlgorithmsNamesAsync()
         {
-            List<string> names = await _db.Algorithms.Select(a => a.Name).ToListAsync();
+            List<string> names = await _db.Algorithms.AsNoTracking().Select(a => a.Name).ToListAsync();
             return names;
         }
     }
