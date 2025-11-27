@@ -1,0 +1,10 @@
+**/bin/
+**/obj/
+**/.vs/
+**/.vscode/
+**/node_modules/
+
+# ненужное
+*.user
+*.suo
+*.DS_Store

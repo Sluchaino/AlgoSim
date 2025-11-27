@@ -1,7 +1,7 @@
-﻿
+﻿using AlgoPlatform.Application.Abstractions;
 using AlgoPlatform.Application.Interfaces;
-using Microsoft.AspNetCore.Mvc;
 using AlgoPlatform.Application.Request;
+using Microsoft.AspNetCore.Mvc;
 
 namespace AlgoPlatform.Controllers
 {
@@ -24,6 +24,13 @@ namespace AlgoPlatform.Controllers
             // Можно вернуть ссылку на эндпоинт статуса; он может быть реализован позже.
             var location = $"/api/submissions/{id}/status";
             return Accepted(location, new { id });
+        }
+
+        [HttpGet("api/submissions/{id:guid}/status")]
+        public async Task<IActionResult> GetStatus([FromRoute] Guid id, [FromServices] ISubmissionStatusStore store)
+        {
+            var s = await store.GetAsync(id);
+            return s is null ? NotFound() : Ok(s);
         }
     }
 }

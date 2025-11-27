@@ -1,6 +1,7 @@
 ﻿using AlgoPlatform.Application.Abstractions;
 using AlgoPlatform.Application.Interfaces;
 using AlgoPlatform.Domain.Models;
+using System.Net.NetworkInformation;
 
 namespace AlgoPlatform.Application.Services
 {
@@ -8,11 +9,13 @@ namespace AlgoPlatform.Application.Services
     {
         private readonly ISubmissionRepository _repo;
         private readonly IUnitOfWork _uow;
+        private readonly ISubmissionStatusStore _status;
 
-        public SubmissionsService(ISubmissionRepository repo, IUnitOfWork uow)
+        public SubmissionsService(ISubmissionRepository repo, IUnitOfWork uow, ISubmissionStatusStore status)
         {
             _repo = repo;
             _uow = uow;
+            _status = status;
         }
 
         public async Task<Guid> CreateAsync(string name, string code, string input, CancellationToken ct)
@@ -30,7 +33,8 @@ namespace AlgoPlatform.Application.Services
             };
 
             await _repo.AddAsync(entity, ct);
-            await _uow.SaveChangesAsync(ct); 
+            await _uow.SaveChangesAsync(ct);
+            await _status.SetAsync(entity.Id, new SubmissionStatus("Queued"));
 
             return entity.Id;
         }
