@@ -23,6 +23,21 @@
     volumes:
       - redisdata:/data
 
+  rabbitmq:
+    image: rabbitmq:3.13-management-alpine
+    ports:
+      - "5672:5672"     # AMQP
+      - "15672:15672"   # веб-UI http://localhost:15672
+    environment:
+      RABBITMQ_DEFAULT_USER: algo
+      RABBITMQ_DEFAULT_PASS: algopass
+      RABBITMQ_DEFAULT_VHOST: /
+    healthcheck:
+      test: ["CMD-SHELL", "rabbitmq-diagnostics -q ping"]
+      interval: 5s
+      timeout: 3s
+      retries: 20
+
   api:
     build:
       context: .
@@ -32,6 +47,10 @@
       ASPNETCORE_URLS: http://0.0.0.0:5280
       ConnectionStrings__DefaultConnection: Host=postgres;Username=algoplatform;Password=777buba777;Database=AlgoPlatform
       Redis__Connection: redis:6379,password=devpass,abortConnect=false
+      RabbitMQ__Host: rabbitmq
+      RabbitMQ__User: algo
+      RabbitMQ__Pass: algopass
+      RabbitMQ__Queue: submissions
     ports:
       - "5280:5280"
     depends_on:
@@ -39,6 +58,8 @@
         condition: service_healthy
       redis:
         condition: service_started
+      rabbitmq:
+        condition: service_healthy
 
 volumes:
   pgdata:
