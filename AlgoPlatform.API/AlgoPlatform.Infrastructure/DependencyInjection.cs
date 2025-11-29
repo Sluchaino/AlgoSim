@@ -8,6 +8,7 @@ using AlgoPlatform.Infrastructure.RabbitMQ.Repositories;
 using Microsoft.EntityFrameworkCore;
 using Microsoft.Extensions.Configuration;
 using Microsoft.Extensions.DependencyInjection;
+using Microsoft.Extensions.Logging;
 using RabbitMQ.Client;
 using StackExchange.Redis;
 
@@ -17,25 +18,29 @@ namespace AlgoPlatform.Infrastructure
     {
         public static IServiceCollection AddInfrastructure(this IServiceCollection services, IConfiguration configuration)
         {
-            // DbContext
+            // ---------- PostgreSQL + EF ----------
             services.AddDbContext<AlgoPlatformDbContext>(opt =>
                 opt.UseNpgsql(configuration.GetConnectionString("DefaultConnection")));
 
-            // Репозитории
             services.AddScoped<IAlgorithmsRepository, AlgorithmsRepository>();
             services.AddScoped<ISubmissionRepository, SubmissionRepository>();
             services.AddScoped<IUnitOfWork, EfUnitOfWork>();
 
-            // Redis
+            // ---------- Redis ----------
             var redisConn = configuration["Redis:Connection"]
-                         ?? configuration.GetConnectionString("Redis")
-                         ?? "localhost:6379,password=devpass,abortConnect=false";
+                            ?? configuration.GetConnectionString("Redis")
+                            ?? "localhost:6379,password=devpass,abortConnect=false";
 
-            services.AddSingleton<IConnectionMultiplexer>(_ => ConnectionMultiplexer.Connect(redisConn));
-            services.AddSingleton<IDatabase>(sp => sp.GetRequiredService<IConnectionMultiplexer>().GetDatabase());
+            services.AddSingleton<IConnectionMultiplexer>(_ =>
+                ConnectionMultiplexer.Connect(redisConn));
+
+            // IDatabase - thread-safe, можно смело шарить
+            services.AddSingleton(sp =>
+                sp.GetRequiredService<IConnectionMultiplexer>().GetDatabase());
+
             services.AddSingleton<ISubmissionStatusStore, RedisSubmissionStatusStore>();
 
-            // RabbitMQ
+            // ---------- RabbitMQ ----------
             var host = configuration["RabbitMQ:Host"] ?? "localhost";
             var user = configuration["RabbitMQ:User"] ?? "guest";
             var pass = configuration["RabbitMQ:Pass"] ?? "guest";
@@ -51,14 +56,43 @@ namespace AlgoPlatform.Infrastructure
                 TopologyRecoveryEnabled = true
             });
 
-            // IConnection (CreateConnectionAsync -> ждём синхронно)
+            // ВАЖНО: только CreateConnectionAsync().GetAwaiter().GetResult()
             services.AddSingleton<IConnection>(sp =>
             {
                 var factory = sp.GetRequiredService<ConnectionFactory>();
+                var loggerFactory = sp.GetService<ILoggerFactory>();
+                var logger = loggerFactory?.CreateLogger("RabbitMqConnection");
+
+                const int maxAttempts = 10;
+                var delay = TimeSpan.FromSeconds(2);
+
+                for (var attempt = 1; attempt <= maxAttempts; attempt++)
+                {
+                    try
+                    {
+                        logger?.LogInformation(
+                            "Connecting to RabbitMQ at {Host} (attempt {Attempt}/{MaxAttempts})",
+                            factory.HostName, attempt, maxAttempts);
+
+                        // тут мы реально получаем IConnection из ValueTask<IConnection>
+                        return factory.CreateConnectionAsync().GetAwaiter().GetResult();
+                    }
+                    catch (Exception ex) when (attempt < maxAttempts)
+                    {
+                        logger?.LogWarning(
+                            ex,
+                            "RabbitMQ not ready yet (attempt {Attempt}/{MaxAttempts}), retrying in {Delay}s",
+                            attempt, maxAttempts, delay.TotalSeconds);
+
+                        Thread.Sleep(delay);
+                    }
+                }
+
+                // последняя попытка без try/catch — если тут упадёт, пусть процесс валится
                 return factory.CreateConnectionAsync().GetAwaiter().GetResult();
             });
 
-            // IChannel (CreateChannelAsync + QueueDeclareAsync -> ждём синхронно)
+            // IChannel (как было)
             services.AddSingleton<IChannel>(sp =>
             {
                 var conn = sp.GetRequiredService<IConnection>();
@@ -81,7 +115,6 @@ namespace AlgoPlatform.Infrastructure
                     sp.GetRequiredService<IChannel>(),
                     configuration["RabbitMQ:Queue"] ?? "submissions"));
 
-            // Раннер и консюмер
             services.AddSingleton<ICodeRunner, DockerCliCodeRunner>();
             services.AddHostedService<RabbitMqExecutorService>();
 

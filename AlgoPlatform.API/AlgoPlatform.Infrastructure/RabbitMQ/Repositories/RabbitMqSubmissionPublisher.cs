@@ -21,7 +21,7 @@ namespace AlgoPlatform.Infrastructure.RabbitMQ.Repositories
 
             var props = new BasicProperties
             {
-                Persistent = true // эквивалент DeliveryMode = 2
+                Persistent = true 
             };
 
             await _ch.BasicPublishAsync(

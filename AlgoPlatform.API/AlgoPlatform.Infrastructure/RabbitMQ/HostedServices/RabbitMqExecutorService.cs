@@ -1,56 +1,47 @@
-﻿using AlgoPlatform.Application.Abstractions;
+﻿using System.Text;
+using AlgoPlatform.Application.Abstractions;
 using Microsoft.Extensions.Configuration;
+using Microsoft.Extensions.DependencyInjection;
 using Microsoft.Extensions.Hosting;
 using Microsoft.Extensions.Logging;
 using RabbitMQ.Client;
 using RabbitMQ.Client.Events;
-using System.Text;
 
 namespace AlgoPlatform.Infrastructure.RabbitMQ.HostedServices
 {
     public sealed class RabbitMqExecutorService : BackgroundService
     {
-        private readonly IChannel _ch;
+        private readonly IChannel _channel;
         private readonly string _queue;
-        private readonly ISubmissionRepository _repo;
-        private readonly IUnitOfWork _uow;
-        private readonly ISubmissionStatusStore _status;
-        private readonly ICodeRunner _runner;
-        private readonly ILogger<RabbitMqExecutorService> _log;
+        private readonly IServiceScopeFactory _scopeFactory;
+        private readonly ILogger<RabbitMqExecutorService> _logger;
 
         public RabbitMqExecutorService(
-            IChannel ch,
-            IConfiguration cfg,
-            ISubmissionRepository repo,
-            IUnitOfWork uow,
-            ISubmissionStatusStore status,
-            ICodeRunner runner,
-            ILogger<RabbitMqExecutorService> log)
+            IChannel channel,
+            IConfiguration configuration,
+            IServiceScopeFactory scopeFactory,
+            ILogger<RabbitMqExecutorService> logger)
         {
-            _ch = ch;
-            _queue = cfg["RabbitMQ:Queue"] ?? "submissions";
-            _repo = repo;
-            _uow = uow;
-            _status = status;
-            _runner = runner;
-            _log = log;
+            _channel = channel;
+            _scopeFactory = scopeFactory;
+            _logger = logger;
+            _queue = configuration["RabbitMQ:Queue"] ?? "submissions";
         }
 
         protected override async Task ExecuteAsync(CancellationToken stoppingToken)
         {
-            // Prefetch 1
-            await _ch.BasicQosAsync(0, 1, false, stoppingToken);
+            await _channel.BasicQosAsync(0, 1, false, stoppingToken);
 
-            var consumer = new AsyncEventingBasicConsumer(_ch);
+            var consumer = new AsyncEventingBasicConsumer(_channel);
             consumer.ReceivedAsync += OnReceivedAsync;
 
-            await _ch.BasicConsumeAsync(
+            await _channel.BasicConsumeAsync(
                 queue: _queue,
                 autoAck: false,
                 consumer: consumer,
                 cancellationToken: stoppingToken);
 
-            _log.LogInformation("Consuming RabbitMQ queue '{Queue}'", _queue);
+            _logger.LogInformation("RabbitMqExecutorService started, queue = {Queue}", _queue);
 
             try
             {
@@ -58,54 +49,63 @@ namespace AlgoPlatform.Infrastructure.RabbitMQ.HostedServices
             }
             catch (OperationCanceledException)
             {
-                // нормальная отмена
+                _logger.LogInformation("RabbitMqExecutorService stopping");
             }
         }
 
         private async Task OnReceivedAsync(object sender, BasicDeliverEventArgs ea)
         {
-            var body = ea.Body.ToArray();
-            var text = Encoding.UTF8.GetString(body);
+            var text = Encoding.UTF8.GetString(ea.Body.ToArray());
 
-            if (!Guid.TryParse(text, out var id))
+            if (!Guid.TryParse(text, out var submissionId))
             {
-                _log.LogWarning("Bad message (not a GUID): {Text}", text);
-                await _ch.BasicAckAsync(ea.DeliveryTag, multiple: false);
+                _logger.LogWarning("Received invalid message (not GUID): {Message}", text);
+                await _channel.BasicAckAsync(ea.DeliveryTag, multiple: false);
                 return;
             }
 
+            using var scope = _scopeFactory.CreateScope();
+
+            var repo = scope.ServiceProvider.GetRequiredService<ISubmissionRepository>();
+            var uow = scope.ServiceProvider.GetRequiredService<IUnitOfWork>();
+            var status = scope.ServiceProvider.GetRequiredService<ISubmissionStatusStore>();
+            var runner = scope.ServiceProvider.GetRequiredService<ICodeRunner>();
+
             try
             {
-                await _status.SetAsync(id, new SubmissionStatus("Running", 0));
+                await status.SetAsync(submissionId, new SubmissionStatus("Running", 0));
 
-                var sub = await _repo.GetAsync(id, CancellationToken.None);
-                if (sub is null)
+                var submission = await repo.GetAsync(submissionId, CancellationToken.None);
+                if (submission is null)
                 {
-                    await _status.SetAsync(id, new SubmissionStatus("Failed", null, "Submission not found"));
-                    await _ch.BasicAckAsync(ea.DeliveryTag, multiple: false);
+                    await status.SetAsync(submissionId,
+                        new SubmissionStatus("Failed", null, "Submission not found"));
+                    await _channel.BasicAckAsync(ea.DeliveryTag, multiple: false);
                     return;
                 }
 
-                var (exit, stdout, stderr) = await _runner.RunAsync(sub.Code, sub.Input, CancellationToken.None);
+                var (exitCode, stdout, stderr) =
+                    await runner.RunAsync(submission.Code, submission.Input, CancellationToken.None);
 
-                // TODO: сохранить stdout/stderr/exit в БД через _repo/_uow
-                // await _uow.SaveChangesAsync(CancellationToken.None);
+                // тут сохраняешь логи/результат в БД
+                submission.Output = stdout;
+                // submission.Error = stderr; submission.ExitCode = exitCode; и т.д.
+                await uow.SaveChangesAsync(CancellationToken.None);
 
-                await _status.SetAsync(
-                    id,
-                    new SubmissionStatus(exit == 0 ? "Completed" : "Failed", 100,
-                        exit == 0 ? "OK" : "Non-zero exit"));
+                var finalStatus = exitCode == 0 ? "Completed" : "Failed";
+                await status.SetAsync(submissionId,
+                    new SubmissionStatus(finalStatus, 100, exitCode == 0 ? "OK" : "Non-zero exit code"));
 
-                await _ch.BasicAckAsync(ea.DeliveryTag, multiple: false);
+                await _channel.BasicAckAsync(ea.DeliveryTag, multiple: false);
             }
             catch (Exception ex)
             {
-                _log.LogError(ex, "Execution failed for {SubmissionId}", id);
-                await _status.SetAsync(id, new SubmissionStatus("Failed", null, ex.Message));
+                _logger.LogError(ex, "Error while processing submission {SubmissionId}", submissionId);
 
-                // В dev можно ack, в prod — рассмотреть Nack + DLX/DLQ
-                await _ch.BasicAckAsync(ea.DeliveryTag, multiple: false);
-                // либо: await _ch.BasicNackAsync(ea.DeliveryTag, multiple: false, requeue: true);
+                await status.SetAsync(submissionId,
+                    new SubmissionStatus("Failed", null, ex.Message));
+
+                await _channel.BasicAckAsync(ea.DeliveryTag, multiple: false);
             }
         }
     }

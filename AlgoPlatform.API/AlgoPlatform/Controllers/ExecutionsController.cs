@@ -1,5 +1,4 @@
 ﻿using AlgoPlatform.Application.Abstractions;
-using Microsoft.AspNetCore.Http;
 using Microsoft.AspNetCore.Mvc;
 
 namespace AlgoPlatform.Controllers
