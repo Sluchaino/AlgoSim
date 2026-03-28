@@ -1,8 +1,10 @@
 ﻿using AlgoPlatform.Application.Abstractions;
+using Amazon.S3;
+using AlgoPlatform.Infrastructure.Artifacts;
 using AlgoPlatform.Infrastructure.Database.PostgreSQL;
 using AlgoPlatform.Infrastructure.Database.PostgreSQL.Repositories;
+using AlgoPlatform.Infrastructure.Storage;
 using AlgoPlatform.Infrastructure.Database.Redis.Repositories;
-using AlgoPlatform.Infrastructure.Execution.Docker;
 using AlgoPlatform.Infrastructure.RabbitMQ.HostedServices;
 using AlgoPlatform.Infrastructure.RabbitMQ.Repositories;
 using Microsoft.EntityFrameworkCore;
@@ -11,12 +13,16 @@ using Microsoft.Extensions.DependencyInjection;
 using Microsoft.Extensions.Logging;
 using RabbitMQ.Client;
 using StackExchange.Redis;
+using System.Collections.Generic;
 
 namespace AlgoPlatform.Infrastructure
 {
     public static class DependencyInjection
     {
-        public static IServiceCollection AddInfrastructure(this IServiceCollection services, IConfiguration configuration)
+        public static IServiceCollection AddInfrastructure(
+            this IServiceCollection services,
+            IConfiguration configuration,
+            bool includeWorker = false)
         {
             // ---------- PostgreSQL + EF ----------
             services.AddDbContext<AlgoPlatformDbContext>(opt =>
@@ -24,6 +30,8 @@ namespace AlgoPlatform.Infrastructure
 
             services.AddScoped<IAlgorithmsRepository, AlgorithmsRepository>();
             services.AddScoped<ISubmissionRepository, SubmissionRepository>();
+            services.AddScoped<IArtifactRepository, ArtifactRepository>();
+            services.AddSingleton<IArtifactHasher, Sha256ArtifactHasher>();
             services.AddScoped<IUnitOfWork, EfUnitOfWork>();
 
             // ---------- Redis ----------
@@ -39,6 +47,9 @@ namespace AlgoPlatform.Infrastructure
                 sp.GetRequiredService<IConnectionMultiplexer>().GetDatabase());
 
             services.AddSingleton<ISubmissionStatusStore, RedisSubmissionStatusStore>();
+            // ---------- S3 Storage ----------
+            services.AddSingleton<IAmazonS3>(_ => S3ArtifactStorage.BuildClient(configuration));
+            services.AddSingleton<IArtifactStorage, S3ArtifactStorage>();
 
             // ---------- RabbitMQ ----------
             var host = configuration["RabbitMQ:Host"] ?? "localhost";
@@ -99,13 +110,64 @@ namespace AlgoPlatform.Infrastructure
                 var ch = conn.CreateChannelAsync().GetAwaiter().GetResult();
 
                 var queue = configuration["RabbitMQ:Queue"] ?? "submissions";
-                ch.QueueDeclareAsync(
-                    queue: queue,
-                    durable: true,
-                    exclusive: false,
-                    autoDelete: false,
-                    arguments: null
-                ).GetAwaiter().GetResult();
+                var retryDelaySeconds = configuration.GetValue<int?>("RabbitMQ:RetryDelaySeconds") ?? 5;
+
+                void DeclareQueueWithRetry(string baseQueue)
+                {
+                    var retryQueue = baseQueue + ".retry";
+                    var deadQueue = baseQueue + ".dead";
+
+                    var mainArgs = new Dictionary<string, object?>
+                    {
+                        ["x-dead-letter-exchange"] = "",
+                        ["x-dead-letter-routing-key"] = deadQueue
+                    };
+
+                    var retryArgs = new Dictionary<string, object?>
+                    {
+                        ["x-message-ttl"] = retryDelaySeconds * 1000,
+                        ["x-dead-letter-exchange"] = "",
+                        ["x-dead-letter-routing-key"] = baseQueue
+                    };
+
+                    ch.QueueDeclareAsync(
+                        queue: baseQueue,
+                        durable: true,
+                        exclusive: false,
+                        autoDelete: false,
+                        arguments: mainArgs
+                    ).GetAwaiter().GetResult();
+
+                    ch.QueueDeclareAsync(
+                        queue: retryQueue,
+                        durable: true,
+                        exclusive: false,
+                        autoDelete: false,
+                        arguments: retryArgs
+                    ).GetAwaiter().GetResult();
+
+                    ch.QueueDeclareAsync(
+                        queue: deadQueue,
+                        durable: true,
+                        exclusive: false,
+                        autoDelete: false,
+                        arguments: null
+                    ).GetAwaiter().GetResult();
+                }
+
+                DeclareQueueWithRetry(queue);
+
+                var runQueue = configuration["RabbitMQ:RunQueue"] ?? "runs";
+                DeclareQueueWithRetry(runQueue);
+
+                var resultQueue = configuration["RabbitMQ:ResultQueue"] ?? "run-results";
+                DeclareQueueWithRetry(resultQueue);
+
+                var compileQueue = configuration["RabbitMQ:CompileQueue"] ?? "compile";
+                DeclareQueueWithRetry(compileQueue);
+
+                var compileResultQueue = configuration["RabbitMQ:CompileResultQueue"] ?? "compile-results";
+                DeclareQueueWithRetry(compileResultQueue);
 
                 return ch;
             });
@@ -114,11 +176,26 @@ namespace AlgoPlatform.Infrastructure
                 new RabbitMqSubmissionPublisher(
                     sp.GetRequiredService<IChannel>(),
                     configuration["RabbitMQ:Queue"] ?? "submissions"));
+            services.AddSingleton<ICompileQueuePublisher>(sp =>
+                new RabbitMqCompilePublisher(
+                    sp.GetRequiredService<IChannel>(),
+                    configuration["RabbitMQ:CompileQueue"] ?? "compile"));
 
-            services.AddSingleton<ICodeRunner, DockerCliCodeRunner>();
-            services.AddHostedService<RabbitMqExecutorService>();
+            services.AddSingleton<IRunQueuePublisher>(sp =>
+                new RabbitMqRunPublisher(
+                    sp.GetRequiredService<IChannel>(),
+                    configuration["RabbitMQ:RunQueue"] ?? "runs"));
+
+            if (includeWorker)
+            {
+                services.AddHostedService<RabbitMqExecutorService>();
+                services.AddHostedService<RabbitMqResultService>();
+                services.AddHostedService<RabbitMqCompileResultService>();
+                services.AddHostedService<RabbitMqHeartbeatService>();
+            }
 
             return services;
         }
     }
 }
+

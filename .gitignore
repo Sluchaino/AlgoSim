@@ -11,6 +11,22 @@
 *.sln.docstates
 *.env
 
+# Local workspace caches (this repo creates these at root on Windows)
+.appdata/
+.localappdata/
+.msbuild/
+.nugetpackages/
+.nugetuser/
+.logs/
+.tmp/
+.dotnet/
+.docker/
+
+# OS junk
+Thumbs.db
+Desktop.ini
+.DS_Store
+
 # User-specific files (MonoDevelop/Xamarin Studio)
 *.userprefs
 
@@ -300,6 +316,17 @@ FakesAssemblies/
 # Node.js Tools for Visual Studio
 .ntvs_analysis.dat
 node_modules/
+**/node_modules/
+
+# Frontend/build outputs
+dist/
+build/
+.cache/
+.parcel-cache/
+.vite/
+.next/
+.nuxt/
+coverage/
 
 # Visual Studio 6 build log
 *.plg

@@ -1,0 +1,21 @@
+﻿/* Р РµРґР°РєС‚РѕСЂ */
+#editor {
+  width: 100%;
+  height: 420px;
+  border: 1px solid #e5e7eb;
+  border-radius: 10px;
+  overflow: hidden;
+}
+#editor *, .monaco-editor, .monaco-editor * {
+  transition: none !important;
+  animation: none !important;
+}
+
+@media (max-width: 720px) {
+  #editor { height: 320px; }
+}
+
+@media (max-width: 480px) {
+  #editor { height: 260px; }
+}
+

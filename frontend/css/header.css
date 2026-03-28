@@ -1,0 +1,170 @@
+﻿.topbar {
+  position: sticky;
+  top: 0;
+  z-index: 50;
+  background: #fff;
+  border-bottom: 1px solid #e5e7eb;
+}
+
+.topbar-inner {
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+  padding: 10px 0;
+}
+
+.topbar-brand {
+  font-weight: 800;
+  font-size: 20px;
+  letter-spacing: 0.2px;
+  text-decoration: none;
+  color: #0b1220;
+  white-space: nowrap;
+}
+
+.tabs {
+  display: grid;
+  grid-template-columns: repeat(6, minmax(0, 1fr));
+  gap: 10px;
+}
+
+.tab {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  height: 44px;
+  padding: 8px 10px;
+  text-decoration: none;
+  text-align: center;
+  white-space: normal;
+  line-height: 1.15;
+  font-size: 13px;
+  color: #0f172a;
+  background: #fff;
+  border: 1px solid #cbd5e1;
+  border-radius: 10px;
+}
+
+.tab:hover {
+  background: #f8fafc;
+  border-color: #94a3b8;
+}
+
+.tab:focus-visible {
+  outline: none;
+  border-color: var(--accent);
+  box-shadow: 0 0 0 3px rgba(37, 99, 235, 0.12);
+}
+
+.tab.active,
+.tab[aria-current="page"] {
+  background: var(--chip-bg);
+  border-color: var(--accent);
+  color: var(--accent);
+  font-weight: 700;
+}
+
+@media (max-width: 1100px) {
+  .tabs { grid-template-columns: repeat(3, minmax(0, 1fr)); }
+  .tab { height: 46px; }
+}
+
+@media (max-width: 640px) {
+  .tabs { grid-template-columns: repeat(2, minmax(0, 1fr)); }
+}
+
+@media (max-width: 420px) {
+  .tabs { grid-template-columns: 1fr; }
+}
+
+.run-status {
+  position: fixed;
+  top: 12px;
+  right: 12px;
+  z-index: 60;
+  min-width: 180px;
+  background: #0f172a;
+  color: #e2e8f0;
+  border: 1px solid rgba(148, 163, 184, 0.35);
+  border-radius: 12px;
+  padding: 10px 12px;
+  box-shadow: 0 12px 30px rgba(15, 23, 42, 0.3);
+  font-size: 12px;
+}
+
+.run-status-title {
+  font-weight: 700;
+  font-size: 12px;
+  color: #f8fafc;
+  margin-bottom: 6px;
+}
+
+.run-status-row {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 10px;
+}
+
+.run-status-steps {
+  margin-top: 8px;
+  display: grid;
+  gap: 6px;
+}
+
+.run-status-step {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 10px;
+  padding: 4px 6px;
+  border-radius: 8px;
+  background: rgba(148, 163, 184, 0.08);
+  border: 1px solid transparent;
+}
+
+.run-status-step.is-active {
+  border-color: rgba(96, 165, 250, 0.6);
+  background: rgba(96, 165, 250, 0.12);
+}
+
+.run-status-step-name {
+  color: #cbd5f5;
+  font-weight: 600;
+}
+
+.run-status-step-time {
+  color: #e2e8f0;
+  font-variant-numeric: tabular-nums;
+}
+
+.run-status-label {
+  color: #94a3b8;
+}
+
+.run-status[data-state="Failed"] #run-status-text {
+  color: #f87171;
+}
+
+.run-status[data-state="Completed"] #run-status-text {
+  color: #86efac;
+}
+
+.run-status[data-state="Running"] #run-status-text,
+.run-status[data-state="Compiling"] #run-status-text,
+.run-status[data-state="Queued"] #run-status-text,
+.run-status[data-state="Retrying"] #run-status-text,
+.run-status[data-state="Submitting"] #run-status-text {
+  color: #60a5fa;
+}
+
+@media (max-width: 720px) {
+  .run-status {
+    top: auto;
+    bottom: 12px;
+    right: 12px;
+    left: 12px;
+    min-width: 0;
+  }
+}
+

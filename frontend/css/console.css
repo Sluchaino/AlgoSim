@@ -1,0 +1,23 @@
+﻿/* РљРѕРЅСЃРѕР»СЊ */
+.console {
+  background: #0b1020;
+  color: #e2e8f0;
+  font-family: ui-monospace, SFMono-Regular, Menlo, Monaco, Consolas, "Liberation Mono", monospace;
+  border-radius: 10px;
+  padding: 10px;
+  height: 220px;
+  overflow-y: auto;
+  max-width: 100%;
+  white-space: pre-wrap;
+  overflow-wrap: anywhere;
+  word-break: break-word;
+}
+
+@media (max-width: 720px) {
+  .console { height: 180px; }
+}
+
+@media (max-width: 480px) {
+  .console { height: 150px; }
+}
+

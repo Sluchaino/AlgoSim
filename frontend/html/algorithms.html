@@ -1,0 +1,518 @@
+﻿<!doctype html>
+<html lang="ru">
+  <head>
+    <meta charset="utf-8" />
+    <meta name="viewport" content="width=device-width,initial-scale=1" />
+    <title>Алгоритмы: массив + редактор C#</title>
+
+    
+    <link rel="stylesheet" href="/css/styles.css" />
+
+    
+    <script defer src="https://cdn.jsdelivr.net/npm/gsap@3/dist/gsap.min.js"></script>
+
+    
+    <script defer src="/js/core/config.js"></script>
+
+    
+    <script src="https://cdn.jsdelivr.net/npm/monaco-editor@0.45.0/min/vs/loader.js"></script>
+
+    
+    
+    <script defer src="/js/viz/core/state.js"></script>
+    <script defer src="/js/viz/core/ranges.js"></script>
+    <script defer src="/js/viz/core/highlights.js"></script>
+    <script defer src="/js/viz/core/scene-core.js"></script>
+    <script defer src="/js/viz/auto/insertion.js"></script>
+    <script defer src="/js/viz/auto/selection.js"></script>
+    <script defer src="/js/viz/auto/quick.js"></script>
+    <script defer src="/js/viz/auto/binary.js"></script>
+    <script defer src="/js/viz/auto/bfs.js"></script>
+    <script defer src="/js/viz/auto/dfs.js"></script>
+    <script defer src="/js/viz/controlled/binary.js"></script>
+
+    
+    <script defer src="/js/ui/ui.js"></script>
+    <script defer src="/js/ui/graph.js"></script>
+    <script defer src="/js/ui/algo-ui.js"></script>
+
+    
+    <script defer src="/js/editor/templates.js"></script>
+    <script defer src="/js/runner/runner.js"></script>
+  </head>
+
+  <body>
+    <div class="run-status" id="run-status" aria-live="polite">
+      <div class="run-status-title">Статус выполнения</div>
+      <div class="run-status-row">
+        <span id="run-status-text">Idle</span>
+      </div>
+      <div class="run-status-row">
+        <span class="run-status-label">Время:</span>
+        <span id="run-timer">00:00</span>
+      </div>
+      <div class="run-status-steps" id="run-status-steps">
+        <div class="run-status-step is-hidden" data-stage="Queued">
+          <span class="run-status-step-name">Очередь</span>
+          <span class="run-status-step-time" data-stage-time="Queued">0 сек</span>
+        </div>
+        <div class="run-status-step is-hidden" data-stage="Compiling">
+          <span class="run-status-step-name">Компиляция</span>
+          <span class="run-status-step-time" data-stage-time="Compiling">0 сек</span>
+        </div>
+        <div class="run-status-step is-hidden" data-stage="Running">
+          <span class="run-status-step-name">Выполнение</span>
+          <span class="run-status-step-time" data-stage-time="Running">0 сек</span>
+        </div>
+        <div class="run-status-step is-hidden" data-stage="Completed">
+          <span class="run-status-step-name">Готово</span>
+          <span class="run-status-step-time" data-stage-time="Completed">0 сек</span>
+        </div>
+        <div class="run-status-step is-hidden" data-stage="Failed">
+          <span class="run-status-step-name">Ошибка</span>
+          <span class="run-status-step-time" data-stage-time="Failed">0 сек</span>
+        </div>
+      </div>
+    </div>
+    <header class="topbar">
+      <div class="topbar-inner wrap">
+        <a class="topbar-brand" href="index.html">AlgoSim</a>
+        <nav class="tabs" id="algo-tabs" aria-label="Algorithms">
+          <a class="tab" data-algo="insertion" href="#insertion">Сортировка вставками</a>
+          <a class="tab" data-algo="selection" href="#selection">Сортировка выбором</a>
+          <a class="tab" data-algo="quick" href="#quick">Быстрая сортировка</a>
+          <a class="tab" data-algo="binary" href="#binary">Бинарный поиск</a>
+          <a class="tab" data-algo="dfs" href="#dfs">Поиск в глубину</a>
+          <a class="tab" data-algo="bfs" href="#bfs">Поиск в ширину</a>
+        </nav>
+      </div>
+    </header>
+    <div class="wrap">
+      <h1>Конструктор массива и редактор алгоритмов на C#</h1>
+      <p class="lead">Выберите алгоритм в шапке, настройте входные данные и запустите код. Визуализация для массивов строится автоматически, без ручных шагов.</p>
+
+      <div class="panel mode-panel" id="mode-panel">
+        <h2>Режим написания алгоритма</h2>
+        <div class="mode-grid">
+          <label class="mode-option">
+            <div class="mode-head">
+              <input type="radio" name="algo-mode" value="auto" checked />
+              <span class="mode-title">Авто-анимация</span>
+            </div>
+            <div class="mode-desc">Работаете с <code>TrackedList</code> как с массивом — шаги фиксируются автоматически.</div>
+          </label>
+          <label class="mode-option">
+            <div class="mode-head">
+              <input type="radio" name="algo-mode" value="controlled" />
+              <span class="mode-title">Контролируемая анимация</span>
+            </div>
+            <div class="mode-desc">Явно вызываете функции трейсера и задаете собственные шаги.</div>
+          </label>
+        </div>
+        <div class="mode-hint" data-mode-view="auto">
+          В этом режиме можно писать алгоритм как обычно — визуализация подхватывает чтения, сравнения и записи.
+        </div>
+        <div class="mode-hint is-hidden" data-mode-view="controlled">
+          В этом режиме вы управляете анимацией вручную: используете <code>ITracer</code>, <code>TracingExtensions</code> и кастомные шаги.
+        </div>
+      </div>
+
+      
+      <div class="grid">
+        <div class="panel" id="theory-panel">
+          <h2>Теория и сигнатуры</h2>
+
+                    <div class="theory" data-theory="insertion">
+            <h3>Сортировка вставками</h3>
+            <p><strong>Сигнатура:</strong> <code>static void InsertionSort(TrackedList a, ITracer t)</code>.</p>
+            <p><strong>Идея:</strong> поддерживаем отсортированный префикс и вставляем следующий элемент, сдвигая большие вправо.</p>
+            <p><strong>Шаги:</strong></p>
+            <ol>
+              <li>Цикл <code>i</code> от 1 до <code>a.Count - 1</code>.</li>
+              <li>Сохрани <code>key = a[i]</code>, <code>j = i - 1</code>.</li>
+              <li>Пока <code>j >= 0</code> и <code>a[j] > key</code>: сдвигай <code>a[j + 1] = a[j]</code>, уменьшая <code>j</code>.</li>
+              <li>Запиши <code>a[j + 1] = key</code>.</li>
+            </ol>
+            <p><strong>Важно:</strong> используйте <code>TrackedList</code> как обычный массив — визуализация будет строиться автоматически.</p>
+          </div>
+
+                    <div class="theory is-hidden" data-theory="selection">
+            <h3>Сортировка выбором</h3>
+            <p><strong>Сигнатура:</strong> <code>static void SelectionSort(TrackedList a, ITracer t)</code>.</p>
+            <p><strong>Идея:</strong> для каждой позиции ищем минимум справа и меняем местами.</p>
+            <p><strong>Шаги:</strong></p>
+            <ol>
+              <li>Цикл <code>i</code> от 0 до <code>a.Count - 2</code>.</li>
+              <li>Положи <code>min = i</code>.</li>
+              <li>Внутренний цикл <code>j</code> от <code>i + 1</code> до конца: если <code>a[j] < a[min]</code>, обнови <code>min</code>.</li>
+              <li>Если <code>min != i</code>, обменяй <code>a[i]</code> и <code>a[min]</code>.</li>
+            </ol>
+            <p><strong>Важно:</strong> обмены через <code>TrackedList</code> автоматически отображаются.</p>
+          </div>
+
+          <div class="theory is-hidden" data-theory="quick">
+            <h3>Быстрая сортировка</h3>
+            <p><strong>Сигнатура:</strong> <code>static void QuickSort(TrackedList a, int left, int right, ITracer t)</code>.</p>
+            <p><strong>Идея:</strong> выбрать опорный элемент и разделить массив на меньшие/большие части.</p>
+            <p><strong>Шаги:</strong></p>
+            <ol>
+              <li>Если <code>left >= right</code> — завершить.</li>
+              <li>Выбери опорный элемент (например, середину).</li>
+              <li>Два индекса <code>i</code> и <code>j</code>: двигаем к центру, пока элементы не нарушают порядок.</li>
+              <li>Если <code>i <= j</code> — обмен <code>a[i]</code> и <code>a[j]</code>, затем <code>i++</code>, <code>j--</code>.</li>
+              <li>Рекурсивно вызови для <code>left..j</code> и <code>i..right</code>.</li>
+            </ol>
+            <p><strong>Важно:</strong> любые сравнения/обмены через <code>TrackedList</code> визуализируются автоматически.</p>
+          </div>
+
+          <div class="theory is-hidden" data-theory="binary">
+            <h3>Бинарный поиск</h3>
+            <p><strong>Сигнатура:</strong> <code>static int BinarySearch(TrackedList a, int target, ITracer t)</code>.</p>
+            <p><strong>Идея:</strong> массив отсортирован, сужаем диапазон поиском середины.</p>
+            <p><strong>Шаги:</strong></p>
+            <ol>
+              <li>Установи <code>l = 0</code>, <code>r = a.Count - 1</code>.</li>
+              <li>Пока <code>l <= r</code>:</li>
+              <li>Вычисли <code>m = (l + r) / 2</code>.</li>
+              <li>Если <code>a[m] == target</code>, верни <code>m</code>.</li>
+              <li>Если <code>a[m] < target</code>, смести <code>l = m + 1</code>, иначе <code>r = m - 1</code>.</li>
+            </ol>
+            <p><strong>Результат:</strong> вернуть индекс или <code>-1</code>, если не найдено.</p>
+          </div>
+
+                    <div class="theory is-hidden" data-theory="bfs">
+            <h3>Поиск в ширину (BFS)</h3>
+            <p><strong>Вход:</strong> JSON из <code>stdin</code> вида <code>{"type":"graph","algo":"bfs","graph":{...},"selection":{"start":"A","end":"D"}}</code>.</p>
+            <p><strong>Идея:</strong> идем слоями от старта с очередью.</p>
+            <p><strong>Шаги:</strong></p>
+            <ol>
+              <li>Прочитай весь <code>stdin</code>, распарсь JSON.</li>
+              <li>Возьми <code>graph</code> как список смежности, <code>start</code>, <code>end</code>.</li>
+              <li>Очередь: помести <code>start</code>, отметь посещенным.</li>
+              <li>Пока очередь не пуста: достань вершину, если это <code>end</code> — можно завершить.</li>
+              <li>Для каждого соседа: если не посещен — отметить и добавить в очередь.</li>
+              <li>Результат выведи в <code>stdout</code> (например, найден/не найден, длина пути).</li>
+            </ol>
+          </div>
+
+                    <div class="theory is-hidden" data-theory="dfs">
+            <h3>Поиск в глубину (DFS)</h3>
+            <p><strong>Вход:</strong> JSON из <code>stdin</code> вида <code>{"type":"graph","algo":"dfs","graph":{...},"selection":{"start":"A","end":"D"}}</code>.</p>
+            <p><strong>Идея:</strong> уходим в глубину рекурсией или стеком.</p>
+            <p><strong>Шаги:</strong></p>
+            <ol>
+              <li>Прочитай весь <code>stdin</code>, распарсь JSON.</li>
+              <li>Возьми <code>graph</code>, <code>start</code>, <code>end</code>.</li>
+              <li>Запусти DFS из <code>start</code>, отмечая посещенные вершины.</li>
+              <li>Если достигли <code>end</code>, можно завершить.</li>
+              <li>Результат выведи в <code>stdout</code> (например, найден/не найден путь).</li>
+            </ol>
+          </div>
+
+          <div class="theory-note" data-mode-view="auto">
+            <p><strong>Авто-режим:</strong> для массивов достаточно работать с <code>TrackedList</code> как с обычным массивом.</p>
+            <p>Чтения, сравнения и записи автоматически формируют шаги визуализации.</p>
+          </div>
+          <div class="theory-note is-hidden" data-mode-view="controlled">
+            <p><strong>Контролируемая анимация:</strong> используйте встроенные функции трейсера.</p>
+            <ul>
+              <li><code>TracingExtensions.EmitArray(t, values)</code> — отправить массив на сцену.</li>
+              <li><code>t.Compare(i, j)</code>, <code>t.Read(i)</code>, <code>t.Write(i, value)</code>, <code>t.Swap(i, j)</code> — базовые операции.</li>
+              <li><code>t.Mark(i, "tag")</code> и шорткаты <code>MarkKey/MarkMin/MarkPivot/MarkSorted</code>.</li>
+              <li><code>TracingExtensions.Range(name, l, r, tag)</code> / <code>ClearRange(name)</code> и <code>Range(l, r, tag)</code> / <code>ClearRanges()</code>.</li>
+              <li><code>TracingExtensions.Ptr(name, index, tag)</code> / <code>ClearPtr(name)</code>.</li>
+              <li><code>t.Step(note|payload)</code> или <code>Console.WriteLine("__STEP__" + JsonSerializer.Serialize(obj))</code> — свои шаги.</li>
+            </ul>
+          </div>
+        </div>
+        <div class="panel" id="array-panel">
+          <h2>Массив</h2>
+
+          
+          <div class="row" style="gap:12px">
+            <label for="manual">Числа через запятую или пробел:</label>
+            <input id="manual" type="text" placeholder="например: 8, 3, 12, 5, 5, 20" style="flex:1 1 360px" />
+            <button id="apply" class="primary">Построить</button>
+          </div>
+          <div class="hint">Разделители: запятая, пробел, точка с запятой. Можно отрицательные, можно нули.</div>
+
+          
+          <div class="row" style="margin-top:10px">
+            <label for="len">Количество:</label>
+            <input id="len" type="number" min="1" max="200" value="12" />
+            <label for="vmin">Мин. значение:</label>
+            <input id="vmin" type="number" value="1" />
+            <label for="vmax">Макс. значение:</label>
+            <input id="vmax" type="number" value="100" />
+          </div>
+          
+          <div class="row" style="margin-top:8px">
+            <button id="gen" class="primary">Сгенерировать</button>
+            <button id="shuffle">Перемешать</button>
+            <button id="clear">Очистить</button>
+            <button id="reset-array">Вернуть исходный</button>
+          </div>
+          <div class="row mt-10 is-hidden" data-binary-only>
+            <label for="target">Искомое число:</label>
+            <input id="target" type="number" placeholder="Например: 42" class="w-120" />
+            <span class="hint">Для бинарного поиска массив автоматически сортируется.</span>
+          </div>
+
+          
+          <div style="margin-top:10px"><strong>Массив:</strong></div>
+          <div id="chips" class="chips"></div>
+
+          <div class="svg-box">
+            
+            <style>
+              
+              #stage .item,
+              #stage .item, #stage .node { will-change: transform; }  
+
+              
+              #stage .item circle,
+              #stage .node circle {
+                fill: #202544;           
+                stroke: #39406e;         
+                stroke-width: 2px;
+                filter: drop-shadow(0 2px 4px rgba(0,0,0,0.25));
+              }
+
+              
+              #stage text {
+                font-family: ui-monospace, SFMono-Regular, Menlo, Monaco, Consolas, "Liberation Mono", "Courier New", monospace;
+                font-size: 14px;
+                dominant-baseline: middle;
+                text-anchor: middle;
+                fill: #e7ecff;
+              }
+
+              
+              #stage .item.cmp    circle,
+              #stage .node.cmp    circle,
+              #stage .item.compare circle,
+              #stage .node.compare circle { stroke: #c2185b; fill: #e91e63; stroke-width: 3px; }   
+
+              #stage .item.swp    circle,
+              #stage .node.swp    circle,
+              #stage .item.swap   circle,
+              #stage .node.swap   circle   { stroke: #ff6e6e; stroke-width: 3px; }  
+
+              #stage .item.read   circle,
+              #stage .node.read   circle   { stroke: #38bdf8; stroke-width: 3px; }  
+
+              #stage .item.write  circle,
+              #stage .node.write  circle,
+              #stage .item.set    circle,
+              #stage .node.set    circle   { stroke: #16a34a; stroke-width: 3px; }  
+
+              
+              #stage .item.key    circle,
+              #stage .node.key    circle   { stroke: #ff9800; fill: #ffeb3b; stroke-width: 3px; }  
+              #stage .item.min    circle,
+              #stage .node.min    circle   { stroke: #ffd966; stroke-width: 3px; }  
+              #stage .item.pivot  circle,
+              #stage .node.pivot  circle   { stroke: #e3a7ff; stroke-width: 3px; }  
+              #stage .item.sorted circle,
+              #stage .node.sorted circle   { stroke: #388e3c; fill: #4caf50; stroke-width: 3px; }  
+              #stage .item.mid    circle,
+              #stage .node.mid    circle   { stroke: #22c55e; stroke-width: 3px; }  
+              #stage .item.found  circle,
+              #stage .node.found  circle   { fill: #22c55e; stroke: #16a34a; stroke-width: 3px; }  
+              #stage .item.pivot.compare circle,
+              #stage .node.pivot.compare circle {
+                stroke: #e3a7ff;
+                fill: #202544;
+                stroke-width: 3px;
+                filter: drop-shadow(0 0 6px rgba(233, 30, 99, 0.65)) drop-shadow(0 0 10px rgba(233, 30, 99, 0.35));
+              }
+
+              
+              #stage .range-rect {
+                fill: url(#rangeGrad);
+                stroke: #6581ff;
+                stroke-dasharray: 6 5;
+                rx: 6; ry: 6;
+                opacity: .55;
+              }
+
+              #stage g.pointers { pointer-events: none; }
+              #stage .ptr { filter: drop-shadow(0 2px 3px rgba(0,0,0,0.35)); }
+              #stage .ptr-triangle { fill: #fbbf24; stroke: #f59e0b; stroke-width: 1.5px; }
+              #stage .ptr-label { fill: #fef3c7; font-size: 11px; font-weight: 600; }
+              #stage .ptr-left .ptr-triangle { fill: #60a5fa; stroke: #3b82f6; }
+              #stage .ptr-right .ptr-triangle { fill: #f87171; stroke: #ef4444; }
+              #stage .ptr-left .ptr-label { fill: #dbeafe; }
+              #stage .ptr-right .ptr-label { fill: #fee2e2; }
+            </style>
+
+            <svg
+              id="stage"
+              viewBox="0 0 600 280"
+              preserveAspectRatio="xMidYMid meet"
+              aria-label="Визуализация массива (кружки двигаются как узлы)"
+            >
+              
+              <defs>
+                <linearGradient id="rangeGrad" x1="0%" y1="0%" x2="0%" y2="100%">
+                  <stop offset="0%"   stop-color="#7aa2ff33"/>
+                  <stop offset="100%" stop-color="#6ef3c533"/>
+                </linearGradient>
+              </defs>
+
+              
+              <g class="ranges" aria-hidden="true"></g>
+
+              
+              <g class="items"></g>
+
+              
+              <desc>Кружки с числами перемещаются целиком при swap/move, а не меняют текст внутри.</desc>
+            </svg>
+          </div>
+          <div class="hint">Радиус круга — линейная функция от значения элемента массива (между минимальным и максимальным).</div>
+          <div class="legend">
+            <div class="legend-title">Легенда (массив)</div>
+            <div class="legend-items">
+              <span class="legend-item"><span class="legend-swatch" style="border-color:#c2185b; background:#e91e63"></span>Сравнение</span>
+              <span class="legend-item"><span class="legend-swatch" style="border-color:#ff6e6e"></span>Свап</span>
+              <span class="legend-item"><span class="legend-swatch" style="border-color:#38bdf8"></span>Чтение</span>
+              <span class="legend-item"><span class="legend-swatch" style="border-color:#16a34a"></span>Запись</span>
+              <span class="legend-item"><span class="legend-swatch" style="border-color:#ff9800; background:#ffeb3b"></span>Key</span>
+              <span class="legend-item"><span class="legend-swatch" style="border-color:#ffd966"></span>Min</span>
+              <span class="legend-item"><span class="legend-swatch" style="border-color:#e3a7ff"></span>Pivot</span>
+              <span class="legend-item"><span class="legend-swatch" style="border-color:#388e3c; background:#4caf50"></span>Sorted</span>
+              <span class="legend-item"><span class="legend-swatch" style="border-color:#22c55e"></span>Mid</span>
+              <span class="legend-item"><span class="legend-swatch" style="border-color:#16a34a; background:#22c55e"></span>Found</span>
+              <span class="legend-item"><span class="legend-rect" style="border-color:#6581ff; background:#7aa2ff33"></span>Диапазон</span>
+            </div>
+          </div>
+          <div id="playback-controls-anchor-array">
+            <div class="row controls" id="playback-controls" style="margin-top:12px; gap:12px">
+              <button id="play">Play</button>
+              <button id="pause">Pause</button>
+              <button id="reset">Reset</button>
+              <button id="stepOnce">Step</button>
+
+            <label for="delay" style="margin-left:12px">Скорость (x):</label>
+            <input id="delay" type="number" min="0.25" max="3" step="0.05" value="1" style="width:90px" />
+
+              <label style="display:flex; align-items:center; gap:6px; margin-left:12px">
+                <input id="autoplay" type="checkbox" checked />
+                Autoplay
+              </label>
+            </div>
+          </div>
+        </div>
+
+        <div class="panel is-hidden" id="graph-panel">
+          <h2>Граф</h2>
+
+          <div class="row gap-12">
+            <label for="node-label">Вершина:</label>
+            <input id="node-label" type="text" placeholder="A" class="w-120" />
+            <button id="add-node" class="primary">Добавить вершину</button>
+            <button id="clear-graph">Очистить граф</button>
+          </div>
+
+          <div class="row mt-8 gap-10">
+            <label for="edge-from">Ребро:</label>
+            <select id="edge-from"></select>
+            <span>→</span>
+            <select id="edge-to"></select>
+            <button id="add-edge">Добавить ребро</button>
+            <button id="delete-edge">Удалить ребро</button>
+          </div>
+
+          <div class="row mt-8 gap-10">
+            <label for="remove-node">Удалить вершину:</label>
+            <select id="remove-node"></select>
+            <button id="delete-node">Удалить вершину</button>
+          </div>
+
+          <div class="row mt-8 gap-10">
+            <label for="start-node">Старт:</label>
+            <select id="start-node"></select>
+            <label for="end-node" class="ml-12">Финиш:</label>
+            <select id="end-node"></select>
+          </div>
+
+          <div class="mt-10">
+            <strong>Вершины:</strong>
+            <div id="graph-nodes" class="chips"></div>
+          </div>
+
+          <div class="mt-10">
+            <strong>Ребра:</strong>
+            <div id="graph-edges" class="graph-edges"></div>
+          </div>
+          <div class="graph-canvas">
+            <svg id="graph-stage" viewBox="0 0 600 280" preserveAspectRatio="xMidYMid meet" aria-label="Graph editor">
+              <defs>
+                <marker
+                  id="graph-arrow"
+                  viewBox="0 0 10 8"
+                  refX="10"
+                  refY="4"
+                  markerWidth="12"
+                  markerHeight="10"
+                  orient="auto"
+                  markerUnits="userSpaceOnUse"
+                >
+                  <path d="M0,0 L10,4 L0,8 Z" fill="currentColor"></path>
+                </marker>
+              </defs>
+              <g class="graph-edges-layer" aria-hidden="true"></g>
+              <g class="graph-nodes-layer"></g>
+            </svg>
+          </div>
+          <div class="hint">Перетаскивайте вершины мышью.</div>
+          <div class="legend">
+            <div class="legend-title">Легенда (граф)</div>
+            <div class="legend-items">
+              <span class="legend-item"><span class="legend-swatch legend-square" style="border-color:#22c55e"></span>Старт</span>
+              <span class="legend-item"><span class="legend-swatch legend-square" style="border-color:#f97316"></span>Финиш</span>
+              <span class="legend-item"><span class="legend-swatch legend-square" style="border-color:#60a5fa"></span>В очереди/стеке</span>
+              <span class="legend-item"><span class="legend-swatch legend-square" style="border-color:#14b8a6; background:#0f2f2a"></span>Посещена</span>
+              <span class="legend-item"><span class="legend-swatch legend-square" style="border-color:#fbbf24"></span>Текущая</span>
+              <span class="legend-item"><span class="legend-swatch legend-square" style="border-color:#22c55e; background:#0f2f1a"></span>Путь</span>
+              <span class="legend-item"><span class="legend-swatch legend-square" style="border-color:#ef4444; background:#2a0f14"></span>Нет пути</span>
+              <span class="legend-item"><span class="legend-line" style="background:#38bdf8"></span>Активное ребро</span>
+              <span class="legend-item"><span class="legend-line" style="background:#22c55e"></span>Ребро пути</span>
+              <span class="legend-item"><span class="legend-line" style="background:#ef4444"></span>Ошибка</span>
+            </div>
+          </div>
+          <div id="playback-controls-anchor-graph"></div>
+        </div>
+
+        <div class="panel">
+          <h2>Редактор кода (C#)</h2>
+
+          <div id="editor" style="margin-top:10px"></div>
+
+          <div class="row controls" style="margin-top:10px">
+            <button id="run" class="primary">Run</button>
+            <button id="stop">Stop</button>
+            <span id="mode-badge" class="badge">Авто-анимация: TrackedList и обычные операции</span>
+          </div>
+          
+
+          <div id="console" class="console" style="margin-top:10px" aria-live="polite"></div>
+        </div>
+      </div>
+
+      <div class="footer is-hidden" data-mode-view="controlled">
+        Поддержка событий:
+        <code>{"kind":"setArray","value":[...]}</code>,
+        <code>{"kind":"swap","i":0,"j":1}</code>,
+        <code>{"kind":"set","i":0,"value":42}</code>.
+        Печатайте как
+        <code>Console.WriteLine("__STEP__" + JsonSerializer.Serialize(obj));</code>
+      </div>
+    </div>
+     
+  </body>
+</html>
+
+
+

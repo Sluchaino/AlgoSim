@@ -1,0 +1,39 @@
+﻿/* helpers.css */
+.is-hidden { display: none !important; }
+
+/* spacing */
+.mt-22 { margin-top: 22px; }
+.mt-14 { margin-top: 14px; }
+.mt-10 { margin-top: 10px; }
+.mt-8  { margin-top: 8px; }
+.mt-2  { margin-top: 2px; }
+
+.ml-12 { margin-left: 12px; }
+
+.m-0   { margin: 0; }
+.mb-8  { margin-bottom: 8px; }
+
+/* layout helpers */
+.gap-12 { gap: 12px; }
+.gap-10 { gap: 10px; }
+.gap-6  { gap: 6px; }
+
+.items-center { align-items: center; }
+.flex-wrap    { flex-wrap: wrap; }
+
+.flex-1-360 { flex: 1 1 360px; }
+
+.minw-240   { min-width: 240px; }
+.flex-1-240 { flex: 1 1 240px; }
+
+.w-120 { width: 120px; }
+.w-90  { width: 90px; }
+
+/* Autoplay checkbox */
+.inline-center {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+}
+
+

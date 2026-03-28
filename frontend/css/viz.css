@@ -1,0 +1,87 @@
+﻿/* Р’РёР·СѓР°Р»РёР·Р°С†РёСЏ SVG */
+.svg-box {
+  width: 100%;
+  border: 1px dashed #e5e7eb;
+  border-radius: 12px;
+  margin-top: 14px;
+  overflow: hidden;
+  background: #fafafa;
+}
+
+#stage { width: 100%; height: 280px; }
+svg { max-width: 100%; height: auto; display: block; }
+
+/* Р‘Р°Р·РѕРІС‹Рµ СЃС‚РёР»Рё РґР»СЏ СѓР·Р»РѕРІ */
+#stage .item { will-change: transform; }
+#stage .item circle {
+  fill: #202544;
+  stroke: #39406e;
+  stroke-width: 2px;
+  filter: drop-shadow(0 2px 4px rgba(0,0,0,.25));
+}
+#stage text {
+  font-family: ui-monospace, SFMono-Regular, Menlo, Monaco, Consolas, "Liberation Mono", monospace;
+  font-size: 14px;
+  dominant-baseline: middle;
+  text-anchor: middle;
+  fill: #e7ecff;
+}
+
+/* РЎРѕСЃС‚РѕСЏРЅРёСЏ СѓР·Р»РѕРІ */
+#stage .item.key circle {
+  fill: #ffeb3b !important;
+  stroke: #ff9800 !important;
+  stroke-width: 3px;
+  filter: drop-shadow(0 2px 8px rgba(255, 152, 0, 0.5));
+  z-index: 1000;
+}
+#stage .item.sorted circle {
+  fill: #4caf50 !important;
+  stroke: #388e3c !important;
+  stroke-width: 2px;
+}
+#stage .item.mid circle {
+  stroke: #22c55e !important;
+  stroke-width: 3px;
+}
+#stage .item.found circle {
+  fill: #22c55e !important;
+  stroke: #16a34a !important;
+  stroke-width: 3px;
+}
+#stage .item.notfound circle {
+  stroke: #ef4444 !important;
+  stroke-width: 3px;
+  fill: #2a0f14 !important;
+}
+#stage .item.compare circle {
+  fill: #e91e63 !important;
+  stroke: #c2185b !important;
+  stroke-width: 3px;
+}
+#stage .item.swap circle {
+  stroke: #ff6e6e;
+  stroke-width: 3px;
+}
+#stage .item.write circle {
+  stroke: #16a34a;
+  stroke-width: 3px;
+}
+
+/* Р”РёР°РїР°Р·РѕРЅС‹ */
+#stage .range-rect {
+  fill: url(#rangeGrad);
+  stroke: #3b82f6;
+  stroke-dasharray: 6 5;
+  rx: 6; ry: 6;
+  opacity: .55;
+}
+
+@media (max-width: 720px) {
+  #stage { height: 220px; }
+}
+
+@media (max-width: 480px) {
+  #stage { height: 200px; }
+}
+

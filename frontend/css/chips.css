@@ -1,0 +1,45 @@
+﻿/* Р§РёРїСЃС‹ */
+.chips { display: flex; flex-wrap: wrap; gap: 8px; margin-top: 8px; }
+.chip {
+  background: var(--chip-bg);
+  color: var(--chip-fg);
+  border-radius: 999px;
+  padding: 6px 10px;
+  font-size: 13px;
+  border: 1px solid #cbd5e1;
+}
+
+/* РЎРѕСЃС‚РѕСЏРЅРёСЏ С‡РёРїСЃРѕРІ */
+.chip.cmp {
+  outline: 2px solid #d97706;
+  background: #fde68a;
+  color: #7c2d12;
+}
+.chip.swp {
+  outline: 2px solid #16a34a;
+  background: #bbf7d0;
+  color: #065f46;
+}
+.chip.key {
+  background: linear-gradient(135deg, #ffeb3b, #ffc107);
+  border: 2px solid #ff9800;
+  color: #333;
+  font-weight: bold;
+  transform: scale(1.1);
+  box-shadow: 0 2px 8px rgba(255, 152, 0, 0.3);
+}
+.chip.comparing {
+  background: #e91e63;
+  color: white;
+  border-color: #c2185b;
+}
+.chip.sorted {
+  background: #4caf50;
+  color: white;
+  border-color: #388e3c;
+}
+.chip.read {
+  background: #d4edda;
+  border-color: #c3e6cb;
+}
+

@@ -1,0 +1,69 @@
+﻿<!doctype html>
+<html lang="ru">
+  <head>
+    <meta charset="utf-8" />
+    <meta name="viewport" content="width=device-width,initial-scale=1" />
+    <title>AlgoSim — платформа изучения алгоритмов</title>
+    <link rel="stylesheet" href="/css/styles.css" />
+  </head>
+  <body>
+    <header class="topbar">
+      <div class="topbar-inner wrap">
+        <a class="topbar-brand" href="index.html">AlgoSim</a>
+        <nav class="tabs" aria-label="Algorithms">
+          <a class="tab" href="algorithms.html#insertion">Сортировка вставками</a>
+          <a class="tab" href="algorithms.html#selection">Сортировка выбором</a>
+          <a class="tab" href="algorithms.html#quick">Быстрая сортировка</a>
+          <a class="tab" href="algorithms.html#binary">Бинарный поиск</a>
+          <a class="tab" href="algorithms.html#dfs">Поиск в глубину</a>
+          <a class="tab" href="algorithms.html#bfs">Поиск в ширину</a>
+        </nav>
+      </div>
+    </header>
+
+    <div class="wrap">
+      <h1>AlgoSim — платформа для изучения алгоритмов на C#</h1>
+      <p class="lead">Здесь можно писать алгоритмы на любом языке, отправлять код на выполнение и получать визуализацию структур данных. Визуализация строится после выполнения программы — без real-time зависимостей от интерфейса.</p>
+
+      <div class="grid">
+        <div class="panel">
+          <h2>Что изучаем</h2>
+          <ul>
+            <li>Сортировка вставками</li>
+            <li>Сортировка выбором</li>
+            <li>Быстрая сортировка</li>
+            <li>Бинарный поиск</li>
+            <li>Поиск в глубину (DFS)</li>
+            <li>Поиск в ширину (BFS)</li>
+          </ul>
+          <p class="hint">Для массивов используется TrackedList, для графов — JSON со списком смежности.</p>
+        </div>
+
+        <div class="panel">
+          <h2>Как работать</h2>
+          <ol>
+            <li>Открой нужный алгоритм.</li>
+            <li>Настрой входные данные: массив или граф.</li>
+            <li>Напиши код с нужной сигнатурой.</li>
+            <li>Запусти выполнение и дождись результатов.</li>
+            <li>Изучай визуализацию шагов и итог.</li>
+          </ol>
+        </div>
+
+        <div class="panel">
+          <h2>Как устроено выполнение</h2>
+          <p>Платформа разделена на API, очередь, воркер и runner. Это позволяет запускать пользовательский код изолированно и безопасно.</p>
+          <ol>
+            <li>API сохраняет отправку в базу и ставит задачу в очередь.</li>
+            <li>Воркер забирает задачу, обновляет статус и передает код в runner.</li>
+            <li>Runner выполняет код в контейнере и пишет логи.</li>
+            <li>Воркер сохраняет логи и финальный статус.</li>
+            <li>Фронтенд получает результат и строит визуализацию.</li>
+          </ol>
+        </div>
+      </div>
+
+    </div>
+  </body>
+</html>
+

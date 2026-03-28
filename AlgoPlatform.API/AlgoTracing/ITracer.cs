@@ -4,7 +4,7 @@ namespace AlgoTracing
 {
     public interface ITracer
     {
-        // Базовые операции
+        // Базовые низкоуровневые операции
         void Compare(int i, int j);
         void Swap(int i, int j);
         void Read(int i);
@@ -13,8 +13,6 @@ namespace AlgoTracing
 
         // Заметки/шаги
         void Step(string? note = null);
-
-        // НОВОЕ: структурный шаг — отправляем произвольный payload (например, setArray, метки, кастомные события)
         void Step(object? payload);
     }
 }

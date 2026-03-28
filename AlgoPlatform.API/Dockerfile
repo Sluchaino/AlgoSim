@@ -1,20 +1,24 @@
 # ===== build =====
-FROM mcr.microsoft.com/dotnet/sdk:9.0 AS build
+FROM mcr.microsoft.com/dotnet/sdk:10.0 AS build
 WORKDIR /src
 COPY . .
 
-# ÂÀÆÍÎ: ïóòü íà òâîé ðåàëüíûé âåá-ïðîåêò
+# Ð’ÐÐ–ÐÐž: Ð¿ÑƒÑ‚ÑŒ Ð½Ð° Ñ‚Ð²Ð¾Ð¹ Ñ€ÐµÐ°Ð»ÑŒÐ½Ñ‹Ð¹ Ð²ÐµÐ±-Ð¿Ñ€Ð¾ÐµÐºÑ‚
 RUN dotnet restore ./AlgoPlatform/AlgoPlatform.csproj
 RUN dotnet publish ./AlgoPlatform/AlgoPlatform.csproj -c Release -o /app /p:UseAppHost=false
 
 # ===== runtime =====
-FROM mcr.microsoft.com/dotnet/aspnet:9.0
+FROM mcr.microsoft.com/dotnet/aspnet:10.0
 WORKDIR /app
 COPY --from=build /app .
 
-# Ñëóøàåì â êîíòåéíåðå íà 0.0.0.0
+RUN apt-get update \
+    && apt-get install -y --no-install-recommends libgssapi-krb5-2 \
+    && rm -rf /var/lib/apt/lists/*
+
+# Ð¡Ð»ÑƒÑˆÐ°ÐµÐ¼ Ð² ÐºÐ¾Ð½Ñ‚ÐµÐ¹Ð½ÐµÑ€Ðµ Ð½Ð° 0.0.0.0
 ENV ASPNETCORE_URLS=http://0.0.0.0:5280
 EXPOSE 5280
 
-# DLL áåð¸òñÿ èç èìåíè ïðîåêòà (AlgoPlatform.csproj -> AlgoPlatform.dll)
+# DLL Ð±ÐµÑ€Ñ‘Ñ‚ÑÑ Ð¸Ð· Ð¸Ð¼ÐµÐ½Ð¸ Ð¿Ñ€Ð¾ÐµÐºÑ‚Ð° (AlgoPlatform.csproj -> AlgoPlatform.dll)
 ENTRYPOINT ["dotnet","AlgoPlatform.dll"]

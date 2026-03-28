@@ -8,6 +8,9 @@ namespace AlgoPlatform.Application.Abstractions
 {
     public interface ICodeRunner
     {
-        Task<(int ExitCode, string Stdout, string Stderr)> RunAsync(string code, string input, CancellationToken ct);
+        Task<(int ExitCode, string Stdout, string Stderr, long DurationMs, bool TimedOut)> RunAsync(
+            string code,
+            string input,
+            CancellationToken ct);
     }
 }

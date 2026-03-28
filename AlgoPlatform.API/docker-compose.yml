@@ -1,4 +1,4 @@
-﻿services:
+services:
   postgres:
     image: postgres:16-alpine
     environment:
@@ -38,6 +38,99 @@
       timeout: 3s
       retries: 20
 
+  minio:
+    image: minio/minio
+    command: server /data --console-address ":9001"
+    environment:
+      MINIO_ROOT_USER: minio
+      MINIO_ROOT_PASSWORD: minio123
+      MINIO_ROOT_USER_FILE: /run/secrets/access_key
+      MINIO_ROOT_PASSWORD_FILE: /run/secrets/secret_key
+      MINIO_ACCESS_KEY_FILE: /run/secrets/access_key
+      MINIO_SECRET_KEY_FILE: /run/secrets/secret_key
+    ports:
+      - "9000:9000"
+      - "9001:9001"
+    volumes:
+      - miniodata:/data
+      - ./minio-secrets:/run/secrets:ro
+
+  minio-init:
+    image: minio/mc
+    depends_on:
+      - minio
+    entrypoint: ["/bin/sh", "-lc"]
+    command: >
+      "mc alias set local http://minio:9000 minio minio123 &&
+       mc mb -p local/algosim-artifacts &&
+       mc anonymous set none local/algosim-artifacts"
+  
+  runner:
+    build:
+      context: .
+      dockerfile: ./Dockerfile.runner
+    environment:
+      ASPNETCORE_URLS: http://0.0.0.0:5291
+      Runner__ContainerRuntime: runsc
+      Runner__HeartbeatIntervalSeconds: 2
+      AWS_ACCESS_KEY_ID: algosim
+      AWS_SECRET_ACCESS_KEY: algosim123
+      AWS_EC2_METADATA_DISABLED: "true"
+      RabbitMQ__Host: rabbitmq
+      RabbitMQ__User: algo
+      RabbitMQ__Pass: algopass
+      RabbitMQ__VHost: /
+      RabbitMQ__RunQueue: runs
+      RabbitMQ__ResultQueue: run-results
+      RabbitMQ__HeartbeatQueue: run-heartbeats
+      RabbitMQ__RetryDelaySeconds: 5
+      RabbitMQ__MaxRetries: 3
+      S3__Endpoint: http://minio:9000
+      S3__Bucket: algosim-artifacts
+      S3__AccessKey: algosim
+      S3__SecretKey: algosim123
+      S3__UsePathStyle: true
+      S3__UseSignatureVersion4: true
+    ports:
+      - "5291:5291"
+    volumes:
+      - /var/run/docker.sock:/var/run/docker.sock
+    depends_on:
+      rabbitmq:
+        condition: service_healthy
+
+  compiler:
+    build:
+      context: .
+      dockerfile: ./Dockerfile.compiler
+    environment:
+      Compiler__ContainerRuntime: runsc
+      Compiler__TimeoutSeconds: 180
+      AWS_ACCESS_KEY_ID: algosim
+      AWS_SECRET_ACCESS_KEY: algosim123
+      AWS_EC2_METADATA_DISABLED: "true"
+      RabbitMQ__Host: rabbitmq
+      RabbitMQ__User: algo
+      RabbitMQ__Pass: algopass
+      RabbitMQ__VHost: /
+      RabbitMQ__CompileQueue: compile
+      RabbitMQ__CompileResultQueue: compile-results
+      RabbitMQ__RetryDelaySeconds: 5
+      RabbitMQ__MaxRetries: 3
+      S3__Endpoint: http://minio:9000
+      S3__Bucket: algosim-artifacts
+      S3__AccessKey: algosim
+      S3__SecretKey: algosim123
+      S3__UsePathStyle: true
+      S3__UseSignatureVersion4: true
+    volumes:
+      - /var/run/docker.sock:/var/run/docker.sock
+    depends_on:
+      rabbitmq:
+        condition: service_healthy
+      minio:
+        condition: service_started
+
   api:
     build:
       context: .
@@ -51,8 +144,47 @@
       RabbitMQ__User: algo
       RabbitMQ__Pass: algopass
       RabbitMQ__Queue: submissions
+      RabbitMQ__HeartbeatQueue: run-heartbeats
+      S3__Endpoint: http://minio:9000
+      S3__Bucket: algosim-artifacts
+      S3__AccessKey: algosim
+      S3__SecretKey: algosim123
+      S3__UsePathStyle: true
+      S3__UseSignatureVersion4: true
     ports:
       - "5280:5280"
+    depends_on:
+      postgres:
+        condition: service_healthy
+      redis:
+        condition: service_started
+      rabbitmq:
+        condition: service_healthy
+
+  worker:
+    build:
+      context: .
+      dockerfile: ./Dockerfile.worker
+    environment:
+      ConnectionStrings__DefaultConnection: Host=postgres;Username=algoplatform;Password=777buba777;Database=AlgoPlatform
+      Redis__Connection: redis:6379,password=devpass,abortConnect=false
+      RabbitMQ__Host: rabbitmq
+      RabbitMQ__User: algo
+      RabbitMQ__Pass: algopass
+      RabbitMQ__Queue: submissions
+      RabbitMQ__RunQueue: runs
+      RabbitMQ__ResultQueue: run-results
+      RabbitMQ__HeartbeatQueue: run-heartbeats
+      RabbitMQ__CompileQueue: compile
+      RabbitMQ__CompileResultQueue: compile-results
+      RabbitMQ__RetryDelaySeconds: 5
+      RabbitMQ__MaxRetries: 3
+      S3__Endpoint: http://minio:9000
+      S3__Bucket: algosim-artifacts
+      S3__AccessKey: algosim
+      S3__SecretKey: algosim123
+      S3__UsePathStyle: true
+      S3__UseSignatureVersion4: true
     depends_on:
       postgres:
         condition: service_healthy
@@ -64,3 +196,4 @@
 volumes:
   pgdata:
   redisdata:
+  miniodata:

@@ -1,4 +1,5 @@
-﻿using AlgoPlatform.Application.Abstractions;
+using AlgoPlatform.Application.Abstractions;
+using AlgoPlatform.Contracts;
 using Microsoft.AspNetCore.Mvc;
 
 namespace AlgoPlatform.Controllers
@@ -15,7 +16,8 @@ namespace AlgoPlatform.Controllers
         public async Task<IActionResult> Enqueue([FromRoute] Guid id, CancellationToken ct)
         {
             await _publisher.PublishAsync(id, ct);
-            return Accepted(new { id, queued = true });
+            return Accepted(new ExecutionEnqueueResponse(id, true));
         }
     }
 }
+

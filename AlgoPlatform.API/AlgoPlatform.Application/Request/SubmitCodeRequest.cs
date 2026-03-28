@@ -6,6 +6,6 @@ namespace AlgoPlatform.Application.Request
     {
         [Required, MinLength(1)] public string Name { get; init; } = null!;
         [Required, MinLength(1)] public string Code { get; init; } = null!;
-        [MaxLength(256_000)] public string Input { get; init; } = null!;
+        [Required, MinLength(1), MaxLength(256_000)] public string Input { get; init; } = null!;
     }
 }

@@ -35,6 +35,11 @@ namespace AlgoPlatform.Application.Services
                 Name = name.Trim(),
                 Code = code,
                 Input = input,
+                Output = string.Empty,
+                Status = "Queued",
+                ExitCode = null,
+                Error = null,
+                DurationMs = null
             };
 
             await _repo.AddAsync(entity, ct);
