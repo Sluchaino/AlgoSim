@@ -13,6 +13,8 @@
     compareIndex: -1,
     sortedEnd: 0,
     awaitingInsert: false,
+    scaleMin: null,
+    scaleMax: null,
     isPlaying: false
   };
 
@@ -66,6 +68,52 @@
     });
   }
 
+  function initScaleFromArray(arr) {
+    if (!Array.isArray(arr) || arr.length === 0) {
+      State.scaleMin = null;
+      State.scaleMax = null;
+      return;
+    }
+    let min = Number.POSITIVE_INFINITY;
+    let max = Number.NEGATIVE_INFINITY;
+    for (let i = 0; i < arr.length; i++) {
+      const v = Number.isFinite(arr[i]) ? arr[i] : 0;
+      if (v < min) min = v;
+      if (v > max) max = v;
+    }
+    if (!Number.isFinite(min) || !Number.isFinite(max)) {
+      State.scaleMin = null;
+      State.scaleMax = null;
+      return;
+    }
+    State.scaleMin = min;
+    State.scaleMax = max;
+  }
+
+  function radiusForValue(value) {
+    const v = Number.isFinite(value) ? value : 0;
+    const min = Number.isFinite(State.scaleMin) ? State.scaleMin : v;
+    const max = Number.isFinite(State.scaleMax) ? State.scaleMax : v;
+    const rMin = (window.VizCFG && Number.isFinite(VizCFG.R_MIN)) ? VizCFG.R_MIN : 14;
+    const rMax = (window.VizCFG && Number.isFinite(VizCFG.R_MAX)) ? VizCFG.R_MAX : 54;
+    const span = Math.max(1, max - min);
+    const normalized = (v - min) / span;
+    return rMin + normalized * (rMax - rMin);
+  }
+
+  function reflowByCurrentRadii(durationMs) {
+    if (!window.VizState || !VizState._S || !Array.isArray(VizState._S.order)) return;
+    const S = VizState._S;
+    const gap = (window.VizCFG && Number.isFinite(VizCFG.GAP)) ? VizCFG.GAP : 14;
+    const pad = (window.VizCFG && Number.isFinite(VizCFG.PAD)) ? VizCFG.PAD : 16;
+    const widthContent = S.order.reduce((sum, it) => sum + (Number.isFinite(it.r) ? it.r * 2 : 0), 0) + gap * Math.max(0, S.order.length - 1);
+    const width = Math.max(400, Math.ceil(pad * 2 + widthContent));
+    if (typeof VizState.applyViewBoxWidth === 'function') VizState.applyViewBoxWidth(width);
+    const sec = Math.max(0, Number(durationMs || 0) / 1000);
+    VizState.layout(sec);
+    ctx.refreshPtrs(sec);
+  }
+
   function setSortedPrefix(endIndex) {
     if (!window.VizState || !VizState._S || !VizState._S.order) return;
     VizState._S.order.forEach((_, index) => {
@@ -78,10 +126,23 @@
 
   function setNodeValue(index, value) {
     if (!Number.isInteger(index) || !window.VizState) return;
+    const node = VizState.nodeAtIndex(index);
+    const item = (window.VizState && VizState._S && Array.isArray(VizState._S.order))
+      ? VizState._S.order[index]
+      : null;
+    const nextRadius = radiusForValue(value);
     VizState.updateValueAt(index, value);
+    if (item && Number.isFinite(nextRadius)) item.r = nextRadius;
+    if (node) {
+      const circle = node.querySelector('circle');
+      if (circle && Number.isFinite(nextRadius)) {
+        circle.setAttribute('r', String(nextRadius));
+      }
+    }
     if (Array.isArray(window.currentArray) && index >= 0 && index < window.currentArray.length) {
       window.currentArray[index] = value;
     }
+    reflowByCurrentRadii(writeMs());
   }
 
   function getNodeCenter(index) {
@@ -213,6 +274,8 @@
     State.compareIndex = -1;
     State.sortedEnd = 0;
     State.awaitingInsert = false;
+    State.scaleMin = null;
+    State.scaleMax = null;
     recentReads.length = 0;
 
     hideKeyBadge();
@@ -286,8 +349,10 @@
     if (!p || typeof p !== 'object') return;
 
     if (p.kind === 'setArray' && Array.isArray(p.value)) {
+      initScaleFromArray(p.value);
       ctx.setCurrentArray(p.value);
       resetInsertionSortState();
+      initScaleFromArray(p.value);
       return;
     }
 
