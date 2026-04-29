@@ -16,11 +16,18 @@ namespace AlgoTracing
         // «Зеркало» массива (поддерживается через setArray и наши же события)
         private int[] _arr = Array.Empty<int>();
 
-        // Для детекции swap по двум set'ам
-        private (int index, int? old, int value)? _pendingWrite;
+        // Для детекции swap по двум set'ам (буферизуем одиночный set, чтобы не мигал "полушаг")
+        private (int index, int? old, int value, int[] after)? _pendingWrite;
 
         // Запоминаем последний Read
         private (int index, int value)? _lastRead;
+        private bool _hasCompareContext;
+        private int _compareI;
+        private int _compareJ;
+        private int? _compareAi;
+        private int? _compareBj;
+        private int? _compareReadI;
+        private int? _compareReadJ;
 
         // Binary search auto-trace state
         private bool _binaryMode;
@@ -31,24 +38,48 @@ namespace AlgoTracing
         private bool _binEqWasTrue;
         private bool _binFound;
 
-        public void Compare(int i, int j) => Emit(new { kind = "compare", i, j });
+        public void Compare(int i, int j)
+        {
+            FlushPendingWrite();
+            int? ai = InRange(i) ? _arr[i] : (int?)null;
+            int? bj = InRange(j) ? _arr[j] : (int?)null;
+            _hasCompareContext = true;
+            _compareI = i;
+            _compareJ = j;
+            _compareAi = ai;
+            _compareBj = bj;
+            _compareReadI = null;
+            _compareReadJ = null;
+            Emit(new { kind = "compare", i, j, ai, bj });
+        }
 
         public void Swap(int i, int j)
         {
+            FlushPendingWrite();
+            int? ai = InRange(i) ? _arr[i] : (int?)null;
+            int? bj = InRange(j) ? _arr[j] : (int?)null;
+
             if (InRange(i) && InRange(j))
                 (_arr[i], _arr[j]) = (_arr[j], _arr[i]);
 
             _pendingWrite = null;
             _lastRead = null;
+            ClearCompareContext();
 
             // В той же строке отдаём массив после обмена
-            Emit(new { kind = "swap", i, j, after = _arr.ToArray() });
+            Emit(new { kind = "swap", i, j, ai, bj, after = _arr.ToArray() });
         }
 
         public void Read(int i)
         {
+            FlushPendingWrite();
             int v = InRange(i) ? _arr[i] : default;
             _lastRead = (i, v);
+            if (_hasCompareContext)
+            {
+                if (i == _compareI && !_compareReadI.HasValue) _compareReadI = v;
+                if (i == _compareJ && !_compareReadJ.HasValue) _compareReadJ = v;
+            }
             Emit(new { kind = "read", i, value = v });
         }
 
@@ -62,7 +93,7 @@ namespace AlgoTracing
                 var (src, srcVal) = _lastRead.Value;
                 if (src != i && srcVal.Equals(value) && InRange(src))
                 {
-                    Emit(new { kind = "move", from = src, to = i }); // информативное событие
+                    Emit(new { kind = "move", from = src, to = i, value = srcVal }); // информативное событие
                 }
             }
 
@@ -74,46 +105,47 @@ namespace AlgoTracing
                     var p = _pendingWrite.Value;
                     if (p.value == old && value == p.old && p.index != i)
                     {
-                        // это обмен двух ячеек
-                        // сначала обновим зеркало как будто set отработал...
+                        // Это обмен двух ячеек, собранный из пары set.
+                        // Первый set уже применён в зеркале, поэтому применяем только второй и
+                        // отдаём единый swap без промежуточного резкого "set"-кадра.
                         if (InRange(i)) _arr[i] = value;
-                        // ...а затем отдадим единое событие swap с after
-                        (_arr[p.index], _arr[i]) = (_arr[i], _arr[p.index]);
-                        Emit(new { kind = "swap", i = p.index, j = i, after = _arr.ToArray() });
+                        Emit(new { kind = "swap", i = p.index, j = i, ai = p.old, bj = old, after = _arr.ToArray() });
                         _pendingWrite = null;
                         _lastRead = null;
+                        ClearCompareContext();
                         return;
                     }
-                    else
-                    {
-                        _pendingWrite = (i, old, value);
-                    }
+
+                    FlushPendingWrite();
                 }
-                else
-                {
-                    _pendingWrite = (i, old, value);
-                }
-            }
-            else
-            {
-                _pendingWrite = null;
+
+                if (InRange(i)) _arr[i] = value;
+                _pendingWrite = (i, old, value, _arr.ToArray());
+                _lastRead = null;
+                ClearCompareContext();
+                return;
             }
 
-            // Обновляем зеркало
+            FlushPendingWrite();
             if (InRange(i)) _arr[i] = value;
-
-            // Главный «низкоуровневый» set + снимок массива после изменения
-            Emit(new { kind = "set", i, value, after = _arr.ToArray() });
-
+            Emit(new { kind = "set", i, value, old, after = _arr.ToArray() });
             _lastRead = null;
+            ClearCompareContext();
         }
 
-        public void Mark(int i, string? tag = null) => Emit(new { kind = "mark", i, tag });
+        public void Mark(int i, string? tag = null)
+        {
+            FlushPendingWrite();
+            int? value = InRange(i) ? _arr[i] : (int?)null;
+            ClearCompareContext();
+            Emit(new { kind = "mark", i, tag, value });
+        }
 
         public void Step(string? note = null) => Step((object)new { kind = "note", text = note });
 
         public void Step(object? payload)
         {
+            FlushPendingWrite();
             // Спец-обработка setArray: обновляем зеркало и печатаем after
             if (payload is not null)
             {
@@ -133,6 +165,7 @@ namespace AlgoTracing
                     Emit(new { kind = "setArray", value = vals, after = _arr.ToArray() });
                     _pendingWrite = null;
                     _lastRead = null;
+                    ClearCompareContext();
                     return;
                 }
             }
@@ -152,17 +185,134 @@ namespace AlgoTracing
                 }
                 if (kind == "compareEx")
                 {
+                    payload = NormalizeCompareExPayload(payload);
                     HandleBinaryCompareEx(payload);
+                    ClearCompareContext();
                 }
             }
 
             TryUpdateMirrorFromPayload(payload);
+            payload = TryEnrichPayload(payload);
             Emit(payload);
         }
 
         // ---- утилиты ----
 
         private bool InRange(int i) => (uint)i < (uint)_arr.Length;
+
+        private void FlushPendingWrite()
+        {
+            if (!_pendingWrite.HasValue) return;
+            var p = _pendingWrite.Value;
+            Emit(new { kind = "set", i = p.index, value = p.value, old = p.old, after = p.after });
+            _pendingWrite = null;
+        }
+
+        private void ClearCompareContext()
+        {
+            _hasCompareContext = false;
+            _compareI = -1;
+            _compareJ = -1;
+            _compareAi = null;
+            _compareBj = null;
+            _compareReadI = null;
+            _compareReadJ = null;
+        }
+
+        private object NormalizeCompareExPayload(object payload)
+        {
+            var i = GetIntProp(payload, "i", -2);
+            var j = GetIntProp(payload, "j", -2);
+            var ai = GetIntProp(payload, "ai", 0);
+            var bj = GetIntProp(payload, "bj", 0);
+            var op = GetStringProp(payload, "op") ?? string.Empty;
+            var result = GetBoolProp(payload, "result", false);
+
+            if (_hasCompareContext && _compareI == i && _compareJ == j)
+            {
+                if (i >= 0)
+                {
+                    ai = _compareReadI ?? _compareAi ?? ai;
+                }
+                if (j >= 0)
+                {
+                    bj = _compareReadJ ?? _compareBj ?? bj;
+                }
+
+                if (TryEvaluateCompare(ai, bj, op, out var normalizedResult))
+                {
+                    result = normalizedResult;
+                }
+            }
+
+            return new { kind = "compareEx", i, j, ai, bj, op, result };
+        }
+
+        private static bool TryEvaluateCompare(int ai, int bj, string op, out bool result)
+        {
+            result = false;
+            switch (op)
+            {
+                case ">":
+                    result = ai > bj;
+                    return true;
+                case "<":
+                    result = ai < bj;
+                    return true;
+                case ">=":
+                    result = ai >= bj;
+                    return true;
+                case "<=":
+                    result = ai <= bj;
+                    return true;
+                case "==":
+                    result = ai == bj;
+                    return true;
+                case "!=":
+                    result = ai != bj;
+                    return true;
+                default:
+                    return false;
+            }
+        }
+
+        private object? TryEnrichPayload(object? payload)
+        {
+            if (payload == null) return null;
+
+            var kind = GetStringProp(payload, "kind");
+            if (string.IsNullOrWhiteSpace(kind)) return payload;
+
+            if (kind == "ptr")
+            {
+                var name = GetStringProp(payload, "name") ?? "ptr";
+                var index = GetIntProp(payload, "index", -1);
+                var tag = GetStringProp(payload, "tag");
+                int? value = InRange(index) ? _arr[index] : (int?)null;
+                return new { kind = "ptr", name, index, tag, value };
+            }
+
+            if (kind == "unmark")
+            {
+                var i = GetIntProp(payload, "i", -1);
+                var tag = GetStringProp(payload, "tag");
+                int? value = InRange(i) ? _arr[i] : (int?)null;
+                return new { kind = "unmark", i, tag, value };
+            }
+
+            if (kind == "range")
+            {
+                var name = GetStringProp(payload, "name") ?? "range";
+                var l = GetIntProp(payload, "l", 0);
+                var r = GetIntProp(payload, "r", 0);
+                var tag = GetStringProp(payload, "tag");
+                int? leftValue = InRange(l) ? _arr[l] : (int?)null;
+                int? rightValue = InRange(r) ? _arr[r] : (int?)null;
+                return new { kind = "range", name, l, r, tag, leftValue, rightValue };
+            }
+
+            return payload;
+        }
 
         private void TryUpdateMirrorFromPayload(object? payload)
         {

@@ -67,7 +67,7 @@ h2 { font-size: 18px; margin: 0 0 10px; }
   border: 1px dashed #cbd5e1;
   border-radius: 10px;
   background: #f8fafc;
-  height: 280px;
+  height: 320px;
   overflow: hidden;
 }
 
@@ -325,12 +325,12 @@ h2 { font-size: 18px; margin: 0 0 10px; }
   h1 { font-size: 20px; }
   h2 { font-size: 17px; }
   .panel { padding: 12px; }
-  .graph-canvas { height: 240px; }
+  .graph-canvas { height: 280px; }
   .mode-grid { grid-template-columns: 1fr; }
 }
 
 @media (max-width: 480px) {
   h1 { font-size: 18px; }
-  .graph-canvas { height: 220px; }
+  .graph-canvas { height: 240px; }
 }
 

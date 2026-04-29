@@ -61,9 +61,11 @@ services:
       - minio
     entrypoint: ["/bin/sh", "-lc"]
     command: >
-      "mc alias set local http://minio:9000 minio minio123 &&
-       mc mb -p local/algosim-artifacts &&
-       mc anonymous set none local/algosim-artifacts"
+      "until mc alias set local http://minio:9000 minio minio123; do
+         echo 'waiting for minio...'; sleep 2;
+       done &&
+       mc mb -p local/algosim-artifacts || true &&
+       mc anonymous set none local/algosim-artifacts || true"
   
   runner:
     build:
@@ -71,24 +73,24 @@ services:
       dockerfile: ./Dockerfile.runner
     environment:
       ASPNETCORE_URLS: http://0.0.0.0:5291
-      Runner__ContainerRuntime: runsc
       Runner__HeartbeatIntervalSeconds: 2
-      AWS_ACCESS_KEY_ID: algosim
-      AWS_SECRET_ACCESS_KEY: algosim123
+      AWS_ACCESS_KEY_ID: minio
+      AWS_SECRET_ACCESS_KEY: minio123
       AWS_EC2_METADATA_DISABLED: "true"
       RabbitMQ__Host: rabbitmq
       RabbitMQ__User: algo
       RabbitMQ__Pass: algopass
       RabbitMQ__VHost: /
       RabbitMQ__RunQueue: runs
+      RabbitMQ__CancelQueue: run-cancel
       RabbitMQ__ResultQueue: run-results
       RabbitMQ__HeartbeatQueue: run-heartbeats
       RabbitMQ__RetryDelaySeconds: 5
       RabbitMQ__MaxRetries: 3
       S3__Endpoint: http://minio:9000
       S3__Bucket: algosim-artifacts
-      S3__AccessKey: algosim
-      S3__SecretKey: algosim123
+      S3__AccessKey: minio
+      S3__SecretKey: minio123
       S3__UsePathStyle: true
       S3__UseSignatureVersion4: true
     ports:
@@ -104,10 +106,9 @@ services:
       context: .
       dockerfile: ./Dockerfile.compiler
     environment:
-      Compiler__ContainerRuntime: runsc
       Compiler__TimeoutSeconds: 180
-      AWS_ACCESS_KEY_ID: algosim
-      AWS_SECRET_ACCESS_KEY: algosim123
+      AWS_ACCESS_KEY_ID: minio
+      AWS_SECRET_ACCESS_KEY: minio123
       AWS_EC2_METADATA_DISABLED: "true"
       RabbitMQ__Host: rabbitmq
       RabbitMQ__User: algo
@@ -119,8 +120,8 @@ services:
       RabbitMQ__MaxRetries: 3
       S3__Endpoint: http://minio:9000
       S3__Bucket: algosim-artifacts
-      S3__AccessKey: algosim
-      S3__SecretKey: algosim123
+      S3__AccessKey: minio
+      S3__SecretKey: minio123
       S3__UsePathStyle: true
       S3__UseSignatureVersion4: true
     volumes:
@@ -144,11 +145,12 @@ services:
       RabbitMQ__User: algo
       RabbitMQ__Pass: algopass
       RabbitMQ__Queue: submissions
+      RabbitMQ__CancelQueue: run-cancel
       RabbitMQ__HeartbeatQueue: run-heartbeats
       S3__Endpoint: http://minio:9000
       S3__Bucket: algosim-artifacts
-      S3__AccessKey: algosim
-      S3__SecretKey: algosim123
+      S3__AccessKey: minio
+      S3__SecretKey: minio123
       S3__UsePathStyle: true
       S3__UseSignatureVersion4: true
     ports:
@@ -173,6 +175,7 @@ services:
       RabbitMQ__Pass: algopass
       RabbitMQ__Queue: submissions
       RabbitMQ__RunQueue: runs
+      RabbitMQ__CancelQueue: run-cancel
       RabbitMQ__ResultQueue: run-results
       RabbitMQ__HeartbeatQueue: run-heartbeats
       RabbitMQ__CompileQueue: compile
@@ -181,8 +184,8 @@ services:
       RabbitMQ__MaxRetries: 3
       S3__Endpoint: http://minio:9000
       S3__Bucket: algosim-artifacts
-      S3__AccessKey: algosim
-      S3__SecretKey: algosim123
+      S3__AccessKey: minio
+      S3__SecretKey: minio123
       S3__UsePathStyle: true
       S3__UseSignatureVersion4: true
     depends_on:

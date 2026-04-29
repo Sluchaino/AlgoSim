@@ -16,6 +16,7 @@ namespace AlgoPlatform.Controllers
         private readonly ISubmissionsService _submissions;
         private readonly ISubmissionStatusStore _statusStore;
         private readonly ISubmissionRepository _repo;
+        private readonly IRunCancelQueuePublisher _runCancelQueue;
         private readonly IUnitOfWork _uow;
         private readonly SubmissionStatusTimeouts _timeouts;
 
@@ -23,17 +24,20 @@ namespace AlgoPlatform.Controllers
             ISubmissionsService submissions,
             ISubmissionStatusStore statusStore,
             ISubmissionRepository repo,
+            IRunCancelQueuePublisher runCancelQueue,
             IUnitOfWork uow,
             IOptions<SubmissionStatusTimeouts> timeouts)
         {
             _submissions = submissions;
             _statusStore = statusStore;
             _repo = repo;
+            _runCancelQueue = runCancelQueue;
             _uow = uow;
             _timeouts = timeouts.Value ?? new SubmissionStatusTimeouts();
         }
 
         // 1) Создать сабмишен и сразу запустить в очередь (через сервис)
+
         [HttpPost]
         public async Task<IActionResult> Create([FromBody] SubmitCodeRequest req, CancellationToken ct)
         {
@@ -48,6 +52,8 @@ namespace AlgoPlatform.Controllers
         }
 
         // 2) Быстрый статус из Redis
+
+
         [HttpGet("{id:guid}/status")]
         public async Task<IActionResult> GetStatus([FromRoute] Guid id, CancellationToken ct)
         {
@@ -68,6 +74,8 @@ namespace AlgoPlatform.Controllers
         }
 
         // 3) Финальный результат из БД (stdout и т.п.)
+
+
         [HttpGet("{id:guid}")]
         public async Task<IActionResult> GetResult([FromRoute] Guid id, CancellationToken ct)
         {
@@ -85,14 +93,37 @@ namespace AlgoPlatform.Controllers
                 submission.DurationMs));
         }
 
+        [HttpPost("{id:guid}/cancel")]
+        public async Task<IActionResult> Cancel([FromRoute] Guid id, CancellationToken ct)
+        {
+            var submission = await _repo.GetAsync(id, ct);
+            if (submission is null) return NotFound();
+
+            if (IsFinalState(submission.Status))
+            {
+                await _statusStore.SetAsync(
+                    id,
+                    new SubmissionStatus(submission.Status, 100, submission.Error));
+                return Ok(new { id = submission.Id, status = submission.Status, message = "Already finished" });
+            }
+
+            submission.Status = "Cancelled";
+            submission.Error = "Cancelled by user";
+            submission.ExitCode ??= -1;
+            await _uow.SaveChangesAsync(ct);
+
+            await _statusStore.SetAsync(id, new SubmissionStatus("Cancelled", 100, "Cancelled by user"));
+            await _runCancelQueue.PublishAsync(id, ct);
+
+            return Accepted(new { id = submission.Id, status = "Cancelled" });
+        }
+
         private async Task<SubmissionStatus?> BuildStatusFromDbAsync(Guid id, CancellationToken ct)
         {
             var submission = await _repo.GetAsync(id, ct);
             if (submission is null) return null;
 
-            var progress = string.Equals(submission.Status, "Completed", StringComparison.OrdinalIgnoreCase)
-                ? (int?)100
-                : null;
+            int? progress = IsFinalState(submission.Status) ? 100 : null;
             var status = new SubmissionStatus(submission.Status, progress, submission.Error);
             await _statusStore.SetAsync(id, status);
             return status;
@@ -107,7 +138,8 @@ namespace AlgoPlatform.Controllers
             var submission = await _repo.GetAsync(id, ct);
             if (submission is not null
                 && !string.Equals(submission.Status, "Completed", StringComparison.OrdinalIgnoreCase)
-                && !string.Equals(submission.Status, "Failed", StringComparison.OrdinalIgnoreCase))
+                && !string.Equals(submission.Status, "Failed", StringComparison.OrdinalIgnoreCase)
+                && !string.Equals(submission.Status, "Cancelled", StringComparison.OrdinalIgnoreCase))
             {
                 submission.Status = "Failed";
                 submission.Error = message;
@@ -119,8 +151,7 @@ namespace AlgoPlatform.Controllers
 
         private bool IsStale(SubmissionStatus status, DateTimeOffset now)
         {
-            if (string.Equals(status.State, "Completed", StringComparison.OrdinalIgnoreCase)
-                || string.Equals(status.State, "Failed", StringComparison.OrdinalIgnoreCase))
+            if (IsFinalState(status.State))
             {
                 return false;
             }
@@ -142,5 +173,10 @@ namespace AlgoPlatform.Controllers
                 _ => TimeSpan.Zero
             };
         }
+
+        private static bool IsFinalState(string? state) =>
+            string.Equals(state, "Completed", StringComparison.OrdinalIgnoreCase)
+            || string.Equals(state, "Failed", StringComparison.OrdinalIgnoreCase)
+            || string.Equals(state, "Cancelled", StringComparison.OrdinalIgnoreCase);
     }
 }

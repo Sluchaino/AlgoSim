@@ -33,6 +33,7 @@
 
     
     <script defer src="/js/ui/ui.js"></script>
+    <script defer src="/js/ui/legend-config.js"></script>
     <script defer src="/js/ui/graph.js"></script>
     <script defer src="/js/ui/algo-ui.js"></script>
 
@@ -71,6 +72,10 @@
         <div class="run-status-step is-hidden" data-stage="Failed">
           <span class="run-status-step-name">Ошибка</span>
           <span class="run-status-step-time" data-stage-time="Failed">0 сек</span>
+        </div>
+        <div class="run-status-step is-hidden" data-stage="Cancelled">
+          <span class="run-status-step-name">Отменено</span>
+          <span class="run-status-step-time" data-stage-time="Cancelled">0 сек</span>
         </div>
       </div>
     </div>
@@ -251,6 +256,7 @@
             <button id="shuffle">Перемешать</button>
             <button id="clear">Очистить</button>
             <button id="reset-array">Вернуть исходный</button>
+            <button id="copy-array">Скопировать массив</button>
           </div>
           <div class="row mt-10 is-hidden" data-binary-only>
             <label for="target">Искомое число:</label>
@@ -259,9 +265,6 @@
           </div>
 
           
-          <div style="margin-top:10px"><strong>Массив:</strong></div>
-          <div id="chips" class="chips"></div>
-
           <div class="svg-box">
             
             <style>
@@ -296,7 +299,7 @@
               #stage .item.swp    circle,
               #stage .node.swp    circle,
               #stage .item.swap   circle,
-              #stage .node.swap   circle   { stroke: #ff6e6e; stroke-width: 3px; }  
+              #stage .node.swap   circle   { stroke: #ff6e6e; fill: #ff9a9a; stroke-width: 3px; }  
 
               #stage .item.read   circle,
               #stage .node.read   circle   { stroke: #38bdf8; stroke-width: 3px; }  
@@ -340,10 +343,10 @@
               #stage .ptr { filter: drop-shadow(0 2px 3px rgba(0,0,0,0.35)); }
               #stage .ptr-triangle { fill: #fbbf24; stroke: #f59e0b; stroke-width: 1.5px; }
               #stage .ptr-label { fill: #fef3c7; font-size: 11px; font-weight: 600; }
-              #stage .ptr-left .ptr-triangle { fill: #60a5fa; stroke: #3b82f6; }
-              #stage .ptr-right .ptr-triangle { fill: #f87171; stroke: #ef4444; }
-              #stage .ptr-left .ptr-label { fill: #dbeafe; }
-              #stage .ptr-right .ptr-label { fill: #fee2e2; }
+              #stage .ptr-left .ptr-triangle { fill: #4b5563; stroke: #374151; }
+              #stage .ptr-right .ptr-triangle { fill: #4b5563; stroke: #374151; }
+              #stage .ptr-left .ptr-label { fill: #1f2937; }
+              #stage .ptr-right .ptr-label { fill: #1f2937; }
             </style>
 
             <svg
@@ -369,38 +372,84 @@
               
               <desc>Кружки с числами перемещаются целиком при swap/move, а не меняют текст внутри.</desc>
             </svg>
+            <div class="viz-steps-corner" data-viz-step-corner aria-live="polite">
+              <div class="viz-steps-corner-head">
+                <span class="viz-steps-corner-meta"><span data-viz-step-current>0</span>/<span data-viz-step-total>0</span></span>
+              </div>
+              <div class="viz-steps-corner-list" data-viz-step-list>Нет шагов</div>
+            </div>
           </div>
-          <div class="hint">Радиус круга — линейная функция от значения элемента массива (между минимальным и максимальным).</div>
-          <div class="legend">
+          <div class="legend" data-legend-scope="array">
             <div class="legend-title">Легенда (массив)</div>
             <div class="legend-items">
-              <span class="legend-item"><span class="legend-swatch" style="border-color:#c2185b; background:#e91e63"></span>Сравнение</span>
-              <span class="legend-item"><span class="legend-swatch" style="border-color:#ff6e6e"></span>Свап</span>
-              <span class="legend-item"><span class="legend-swatch" style="border-color:#38bdf8"></span>Чтение</span>
-              <span class="legend-item"><span class="legend-swatch" style="border-color:#16a34a"></span>Запись</span>
-              <span class="legend-item"><span class="legend-swatch" style="border-color:#ff9800; background:#ffeb3b"></span>Key</span>
-              <span class="legend-item"><span class="legend-swatch" style="border-color:#ffd966"></span>Min</span>
-              <span class="legend-item"><span class="legend-swatch" style="border-color:#e3a7ff"></span>Pivot</span>
-              <span class="legend-item"><span class="legend-swatch" style="border-color:#388e3c; background:#4caf50"></span>Sorted</span>
-              <span class="legend-item"><span class="legend-swatch" style="border-color:#22c55e"></span>Mid</span>
-              <span class="legend-item"><span class="legend-swatch" style="border-color:#16a34a; background:#22c55e"></span>Found</span>
-              <span class="legend-item"><span class="legend-rect" style="border-color:#6581ff; background:#7aa2ff33"></span>Диапазон</span>
+              <span class="legend-item" data-legend-item="compare"><span class="legend-swatch" style="border-color:#c2185b; background:#e91e63"></span>Сравнение</span>
+                <span class="legend-item" data-legend-item="swap"><span class="legend-swatch" style="border-color:#ff6e6e"></span>Обмен</span>
+              <span class="legend-item" data-legend-item="read"><span class="legend-swatch" style="border-color:#38bdf8"></span>Чтение</span>
+              <span class="legend-item" data-legend-item="write"><span class="legend-swatch" style="border-color:#16a34a"></span>Запись</span>
+              <span class="legend-item" data-legend-item="key"><span class="legend-swatch" style="border-color:#ff9800; background:#ffeb3b"></span>Ключ</span>
+              <span class="legend-item" data-legend-item="min"><span class="legend-swatch" style="border-color:#ffd966"></span>Min</span>
+              <span class="legend-item" data-legend-item="pivot"><span class="legend-swatch" style="border-color:#e3a7ff"></span>Pivot</span>
+              <span class="legend-item" data-legend-item="sorted"><span class="legend-swatch" style="border-color:#388e3c; background:#4caf50"></span>Отсортировано</span>
+              <span class="legend-item" data-legend-item="mid"><span class="legend-swatch" style="border-color:#22c55e"></span>Mid</span>
+              <span class="legend-item" data-legend-item="found"><span class="legend-swatch" style="border-color:#16a34a; background:#22c55e"></span>Found</span>
+              <span class="legend-item" data-legend-item="range"><span class="legend-rect" style="border-color:#6581ff; background:#7aa2ff33"></span>Диапазон</span>
             </div>
           </div>
           <div id="playback-controls-anchor-array">
             <div class="row controls" id="playback-controls" style="margin-top:12px; gap:12px">
-              <button id="play">Play</button>
-              <button id="pause">Pause</button>
-              <button id="reset">Reset</button>
-              <button id="stepOnce">Step</button>
-
-            <label for="delay" style="margin-left:12px">Скорость (x):</label>
-            <input id="delay" type="number" min="0.25" max="3" step="0.05" value="1" style="width:90px" />
+              <button id="playPause">Воспроизвести</button>
+              <button id="reset">Сброс</button>
+              <button id="replayAnimation">Повтор</button>
+              <button id="stepOnce">Шаг</button>
+              <label for="speed-swap" class="ml-12">Обмен (мс):</label>
+              <input id="speed-swap" type="number" min="50" max="12000" step="50" value="3000" class="w-90" />
+              <label for="speed-other">Остальное (мс):</label>
+              <input id="speed-other" type="text" inputmode="numeric" value="500" class="w-90" />
+              <button id="toggle-speed-details" type="button">Подробнее</button>
 
               <label style="display:flex; align-items:center; gap:6px; margin-left:12px">
                 <input id="autoplay" type="checkbox" checked />
                 Autoplay
               </label>
+            </div>
+            <div id="speed-details-panel" class="speed-details is-hidden" aria-live="polite">
+              <div class="speed-details-title">Подробные настройки скорости (мс)</div>
+              <div class="speed-details-grid">
+                <label class="speed-field" for="speed-compare">
+                  <span>Сравнение</span>
+                  <input id="speed-compare" type="number" min="50" max="12000" step="50" value="500" class="w-90" />
+                </label>
+                <label class="speed-field" for="speed-read">
+                  <span>Чтение</span>
+                  <input id="speed-read" type="number" min="50" max="12000" step="50" value="500" class="w-90" />
+                </label>
+                <label class="speed-field" for="speed-write">
+                  <span>Запись</span>
+                  <input id="speed-write" type="number" min="50" max="12000" step="50" value="500" class="w-90" />
+                </label>
+                <label class="speed-field" for="speed-move">
+                  <span>Перемещение</span>
+                  <input id="speed-move" type="number" min="50" max="12000" step="50" value="500" class="w-90" />
+                </label>
+                <label class="speed-field" for="speed-set">
+                  <span>Установка значения</span>
+                  <input id="speed-set" type="number" min="50" max="12000" step="50" value="500" class="w-90" />
+                </label>
+                <label class="speed-field" for="speed-range-speed">
+                  <span>Диапазон</span>
+                  <input id="speed-range-speed" type="number" min="50" max="12000" step="50" value="500" class="w-90" />
+                </label>
+              </div>
+            </div>
+            <div class="steps-panel" id="steps-panel">
+              <div class="steps-panel-head">
+                <div class="steps-panel-title">Шаги алгоритма</div>
+                <div class="steps-panel-meta"><span id="step-current">0</span>/<span id="step-total">0</span></div>
+              </div>
+              <div class="steps-panel-range">
+                <input id="step-range" type="range" min="0" max="0" value="0" />
+              </div>
+              <div class="steps-list" id="steps-list" aria-live="polite" tabindex="0"></div>
             </div>
           </div>
         </div>
@@ -465,21 +514,27 @@
               <g class="graph-edges-layer" aria-hidden="true"></g>
               <g class="graph-nodes-layer"></g>
             </svg>
+            <div class="viz-steps-corner" data-viz-step-corner aria-live="polite">
+              <div class="viz-steps-corner-head">
+                <span class="viz-steps-corner-meta"><span data-viz-step-current>0</span>/<span data-viz-step-total>0</span></span>
+              </div>
+              <div class="viz-steps-corner-list" data-viz-step-list>Нет шагов</div>
+            </div>
           </div>
           <div class="hint">Перетаскивайте вершины мышью.</div>
-          <div class="legend">
+          <div class="legend" data-legend-scope="graph">
             <div class="legend-title">Легенда (граф)</div>
             <div class="legend-items">
-              <span class="legend-item"><span class="legend-swatch legend-square" style="border-color:#22c55e"></span>Старт</span>
-              <span class="legend-item"><span class="legend-swatch legend-square" style="border-color:#f97316"></span>Финиш</span>
-              <span class="legend-item"><span class="legend-swatch legend-square" style="border-color:#60a5fa"></span>В очереди/стеке</span>
-              <span class="legend-item"><span class="legend-swatch legend-square" style="border-color:#14b8a6; background:#0f2f2a"></span>Посещена</span>
-              <span class="legend-item"><span class="legend-swatch legend-square" style="border-color:#fbbf24"></span>Текущая</span>
-              <span class="legend-item"><span class="legend-swatch legend-square" style="border-color:#22c55e; background:#0f2f1a"></span>Путь</span>
-              <span class="legend-item"><span class="legend-swatch legend-square" style="border-color:#ef4444; background:#2a0f14"></span>Нет пути</span>
-              <span class="legend-item"><span class="legend-line" style="background:#38bdf8"></span>Активное ребро</span>
-              <span class="legend-item"><span class="legend-line" style="background:#22c55e"></span>Ребро пути</span>
-              <span class="legend-item"><span class="legend-line" style="background:#ef4444"></span>Ошибка</span>
+              <span class="legend-item" data-legend-item="start"><span class="legend-swatch legend-square" style="border-color:#22c55e"></span>Старт</span>
+              <span class="legend-item" data-legend-item="end"><span class="legend-swatch legend-square" style="border-color:#f97316"></span>Финиш</span>
+              <span class="legend-item" data-legend-item="frontier"><span class="legend-swatch legend-square" style="border-color:#60a5fa"></span>В очереди/стеке</span>
+              <span class="legend-item" data-legend-item="visited"><span class="legend-swatch legend-square" style="border-color:#14b8a6; background:#0f2f2a"></span>Посещена</span>
+              <span class="legend-item" data-legend-item="current"><span class="legend-swatch legend-square" style="border-color:#fbbf24"></span>Текущая</span>
+              <span class="legend-item" data-legend-item="path"><span class="legend-swatch legend-square" style="border-color:#22c55e; background:#0f2f1a"></span>Путь</span>
+              <span class="legend-item" data-legend-item="notfound"><span class="legend-swatch legend-square" style="border-color:#ef4444; background:#2a0f14"></span>Нет пути</span>
+              <span class="legend-item" data-legend-item="edge-active"><span class="legend-line" style="background:#38bdf8"></span>Активное ребро</span>
+              <span class="legend-item" data-legend-item="edge-path"><span class="legend-line" style="background:#22c55e"></span>Ребро пути</span>
+              <span class="legend-item" data-legend-item="edge-notfound"><span class="legend-line" style="background:#ef4444"></span>Ошибка</span>
             </div>
           </div>
           <div id="playback-controls-anchor-graph"></div>
@@ -493,6 +548,7 @@
           <div class="row controls" style="margin-top:10px">
             <button id="run" class="primary">Run</button>
             <button id="stop">Stop</button>
+            <button id="export-raw-logs" disabled>Экспорт raw логов</button>
             <span id="mode-badge" class="badge">Авто-анимация: TrackedList и обычные операции</span>
           </div>
           

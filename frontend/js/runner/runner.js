@@ -3,16 +3,20 @@
   const consoleEl = document.getElementById('console');
   const statusBox = document.getElementById('run-status');
   const statusText = document.getElementById('run-status-text');
+  const btnExportRawLogs = document.getElementById('export-raw-logs');
   const timerEl = document.getElementById('run-timer');
   const stageTimeEls = {};
   const stageStepEls = {};
-  const STAGES = ['Queued', 'Compiling', 'Running', 'Completed', 'Failed'];
+  const STAGES = ['Queued', 'Compiling', 'Running', 'Completed', 'Failed', 'Cancelled'];
   let timerId = null;
   let timerStart = null;
   let currentStage = null;
   let stageStart = null;
   const stageDurations = new Map();
   const stageSeen = new Set();
+  let lastServerRawLogs = '';
+  let lastServerSubmissionId = null;
+  let lastServerAlgo = 'run';
 
   document.querySelectorAll('[data-stage-time]').forEach(el => {
     stageTimeEls[el.dataset.stageTime] = el;
@@ -25,6 +29,49 @@
     if (!consoleEl) return;
     consoleEl.textContent += (line ?? '') + "\n";
     consoleEl.scrollTop = consoleEl.scrollHeight;
+  }
+
+  function setRawExportEnabled(enabled) {
+    if (!btnExportRawLogs) return;
+    btnExportRawLogs.disabled = !enabled;
+  }
+
+  function resetRawExportState() {
+    lastServerRawLogs = '';
+    lastServerSubmissionId = null;
+    lastServerAlgo = getAlgoKey();
+    setRawExportEnabled(false);
+  }
+
+  function rememberRawServerLogs(rawOutput, submissionId, algoKey) {
+    if (typeof rawOutput !== 'string' || rawOutput.length === 0) {
+      resetRawExportState();
+      return;
+    }
+    lastServerRawLogs = rawOutput;
+    lastServerSubmissionId = submissionId || null;
+    lastServerAlgo = (algoKey || getAlgoKey() || 'run').toLowerCase();
+    setRawExportEnabled(true);
+  }
+
+  function downloadTextFile(filename, text) {
+    const blob = new Blob([text], { type: 'text/plain;charset=utf-8' });
+    const url = URL.createObjectURL(blob);
+    const a = document.createElement('a');
+    a.href = url;
+    a.download = filename;
+    document.body.appendChild(a);
+    a.click();
+    a.remove();
+    URL.revokeObjectURL(url);
+  }
+
+  function sanitizeFilePart(text) {
+    return String(text || '')
+      .trim()
+      .replace(/[^a-z0-9_-]+/gi, '-')
+      .replace(/-+/g, '-')
+      .replace(/^-|-$/g, '') || 'run';
   }
 
   function setStatus(text) {
@@ -40,6 +87,7 @@
     if (lower === 'running') return 'Running';
     if (lower === 'completed') return 'Completed';
     if (lower === 'failed') return 'Failed';
+    if (lower === 'cancelled') return 'Cancelled';
     return raw;
   }
 
@@ -121,7 +169,7 @@
   function handleStatusStage(state) {
     const s = normalizeStage(state);
     if (!STAGES.includes(s)) return;
-    if (s === 'Completed' || s === 'Failed') {
+    if (s === 'Completed' || s === 'Failed' || s === 'Cancelled') {
       finalizeStages(s);
       return;
     }
@@ -453,6 +501,12 @@ ${printLine}
       this.processItem = processItem;
       this.processed = 0;
       this._nextDelayMs = null;
+      this.onStateChange = null;
+    }
+    _notifyState() {
+      if (typeof this.onStateChange === 'function') {
+        try { this.onStateChange(this.isPlaying); } catch {}
+      }
     }
     setDelay(ms) {
       const n = Math.max(0, Math.floor(ms || 0));
@@ -466,9 +520,24 @@ ${printLine}
       else this.queue.push(items);
       if (this.isPlaying && this.timer === null) this._scheduleNext();
     }
+    setQueue(items, processed = 0) {
+      this.pause();
+      this.queue = Array.isArray(items) ? items.slice() : [];
+      this.processed = Math.max(0, Number.isFinite(processed) ? Math.floor(processed) : 0);
+    }
     clear() { this.queue.length = 0; this.processed = 0; }
-    play() { if (this.isPlaying) return; this.isPlaying = true; this._scheduleNext(); }
-    pause() { this.isPlaying = false; if (this.timer !== null) { clearTimeout(this.timer); this.timer = null; } }
+    play() {
+      if (this.isPlaying) return;
+      if (this.queue.length === 0) { this.isPlaying = false; this._notifyState(); return; }
+      this.isPlaying = true;
+      this._notifyState();
+      this._scheduleNext();
+    }
+    pause() {
+      this.isPlaying = false;
+      if (this.timer !== null) { clearTimeout(this.timer); this.timer = null; }
+      this._notifyState();
+    }
     stop() { this.pause(); this.clear(); }
     stepOnce() {
       if (this.queue.length === 0) return;
@@ -493,73 +562,704 @@ ${printLine}
           }
         } catch {}
         this.processed++;
+        if (this.queue.length === 0) {
+          this.isPlaying = false;
+          this._notifyState();
+          return;
+        }
         this._scheduleNext();
       }, delay);
     }
   }
 
-  const player = new LogPlayer((item) => {
+  const btnPlayPause = document.getElementById('playPause');
+  const btnReset = document.getElementById('reset');
+  const btnReplay = document.getElementById('replayAnimation');
+  const btnStep = document.getElementById('stepOnce');
+  const inpSpeedSwap = document.getElementById('speed-swap');
+  const inpSpeedOther = document.getElementById('speed-other');
+  const btnSpeedDetails = document.getElementById('toggle-speed-details');
+  const speedDetailsPanel = document.getElementById('speed-details-panel');
+  const inpSpeedCompare = document.getElementById('speed-compare');
+  const inpSpeedRead = document.getElementById('speed-read');
+  const inpSpeedWrite = document.getElementById('speed-write');
+  const inpSpeedMove = document.getElementById('speed-move');
+  const inpSpeedSet = document.getElementById('speed-set');
+  const inpSpeedRange = document.getElementById('speed-range-speed');
+  const chkAutoplay = document.getElementById('autoplay');
+  const stepRange = document.getElementById('step-range');
+  const stepList = document.getElementById('steps-list');
+  const stepCurrentEl = document.getElementById('step-current');
+  const stepTotalEl = document.getElementById('step-total');
+  const stepCornerEls = Array.from(document.querySelectorAll('[data-viz-step-corner]'));
+
+  let timelineStepItems = [];
+  let timelineInitialArray = [];
+  let timelineAlgo = 'insertion';
+  let timelineCursor = 0;
+  let timelineUiFrozen = false;
+  let stepListAutoFollow = true;
+  let stepListProgrammaticScroll = false;
+  let stepListProgrammaticTimer = null;
+
+  const MS_MIN = 50;
+  const MS_MAX = 12000;
+  const DEFAULT_OTHER_MS = 500;
+  const DEFAULT_SWAP_MS = 3000;
+  const DEFAULT_SPEED_CONFIG = {
+    swap: DEFAULT_SWAP_MS,
+    other: DEFAULT_OTHER_MS,
+    compare: DEFAULT_OTHER_MS,
+    read: DEFAULT_OTHER_MS,
+    write: DEFAULT_OTHER_MS,
+    move: DEFAULT_OTHER_MS,
+    set: DEFAULT_OTHER_MS,
+    range: DEFAULT_OTHER_MS
+  };
+  let lastSpeedConfig = { ...DEFAULT_SPEED_CONFIG };
+  const OTHER_CUSTOM_TEXT = 'своё';
+  const OTHER_CUSTOM_TEXT_ALT = 'свое';
+  const DETAIL_SPEED_FIELDS = [
+    { key: 'compare', el: inpSpeedCompare, label: 'Сравнение' },
+    { key: 'read', el: inpSpeedRead, label: 'Чтение' },
+    { key: 'write', el: inpSpeedWrite, label: 'Запись' },
+    { key: 'move', el: inpSpeedMove, label: 'Перемещение' },
+    { key: 'set', el: inpSpeedSet, label: 'Установка значения' },
+    { key: 'range', el: inpSpeedRange, label: 'Диапазон' }
+  ];
+
+  function parseSpeedInput(el) {
+    const raw = (el && typeof el.value === 'string') ? el.value.trim() : '';
+    if (!raw) return null;
+    const parsed = Number(raw.replace(',', '.'));
+    return Number.isFinite(parsed) ? parsed : NaN;
+  }
+
+  function normalizeMsValue(v) {
+    return Math.min(MS_MAX, Math.max(MS_MIN, Math.round(v)));
+  }
+
+  function isOtherCustomValue(raw) {
+    const t = String(raw || '').trim().toLowerCase();
+    return t === OTHER_CUSTOM_TEXT || t === OTHER_CUSTOM_TEXT_ALT;
+  }
+
+  function setOtherSpeedText(text, mode) {
+    if (!inpSpeedOther) return;
+    inpSpeedOther.value = text;
+    inpSpeedOther.dataset.mode = mode || '';
+  }
+
+  function setOtherSpeedNumber(ms) {
+    setOtherSpeedText(String(normalizeMsValue(ms)), 'linked');
+  }
+
+  function setOtherSpeedCustom() {
+    setOtherSpeedText(OTHER_CUSTOM_TEXT, 'custom');
+  }
+
+  function setDetailSpeeds(ms) {
+    const value = normalizeMsValue(ms);
+    DETAIL_SPEED_FIELDS.forEach(field => {
+      if (field.el) field.el.value = String(value);
+    });
+  }
+
+  function getDetailSpeedValues(cfg) {
+    return DETAIL_SPEED_FIELDS.map(field => cfg[field.key]).filter(Number.isFinite);
+  }
+
+  function areAllEqual(values) {
+    if (!Array.isArray(values) || values.length === 0) return true;
+    return values.every(v => v === values[0]);
+  }
+
+  function validateSpeedField(field, strict, prev) {
+    const raw = parseSpeedInput(field.el);
+    if (raw === null) {
+      if (strict) {
+        return { ok: false, error: `[error] Поле "${field.label}" не заполнено. Укажите значение больше ${MS_MIN} мс.` };
+      }
+      return { ok: true, value: prev };
+    }
+    if (!Number.isFinite(raw)) {
+      if (strict) {
+        return { ok: false, error: `[error] Поле "${field.label}" должно быть числом больше ${MS_MIN} мс.` };
+      }
+      return { ok: true, value: prev };
+    }
+    if (raw <= 0) {
+      if (strict) {
+        return { ok: false, error: `[error] Поле "${field.label}" должно быть больше ${MS_MIN} мс.` };
+      }
+      return { ok: true, value: prev };
+    }
+    return { ok: true, value: normalizeMsValue(raw) };
+  }
+
+  function refreshOtherSpeedField(cfg, mode) {
+    const detailValues = getDetailSpeedValues(cfg);
+    if (!detailValues.length) {
+      setOtherSpeedNumber(DEFAULT_OTHER_MS);
+      return;
+    }
+    if (mode === 'linked') {
+      setOtherSpeedNumber(cfg.other);
+      return;
+    }
+    if (areAllEqual(detailValues)) {
+      setOtherSpeedNumber(detailValues[0]);
+      return;
+    }
+    setOtherSpeedCustom();
+  }
+
+  function syncDetailSpeedsFromOther() {
+    const rawOther = parseSpeedInput(inpSpeedOther);
+    if (!Number.isFinite(rawOther) || rawOther <= 0) return false;
+    const other = normalizeMsValue(rawOther);
+    setDetailSpeeds(other);
+    setOtherSpeedNumber(other);
+    return true;
+  }
+
+  function collectSpeedConfig(strict = false) {
+    const prev = lastSpeedConfig || { ...DEFAULT_SPEED_CONFIG };
+    const cfg = { ...prev };
+    const swapField = { key: 'swap', el: inpSpeedSwap, label: 'Обмен' };
+
+    const swapResult = validateSpeedField(swapField, strict, prev.swap);
+    if (!swapResult.ok) return swapResult;
+    cfg.swap = swapResult.value;
+
+    for (const field of DETAIL_SPEED_FIELDS) {
+      const result = validateSpeedField(field, strict, prev[field.key]);
+      if (!result.ok) return result;
+      cfg[field.key] = result.value;
+    }
+
+    const otherRaw = (inpSpeedOther && typeof inpSpeedOther.value === 'string')
+      ? inpSpeedOther.value.trim()
+      : '';
+    const customMode = isOtherCustomValue(otherRaw);
+
+    if (!customMode) {
+      const otherParsed = parseSpeedInput(inpSpeedOther);
+      if (otherParsed === null || !Number.isFinite(otherParsed) || otherParsed <= 0) {
+        if (strict) {
+          if (!otherRaw) {
+            cfg.other = MS_MIN;
+            setOtherSpeedNumber(MS_MIN);
+            setDetailSpeeds(cfg.other);
+            DETAIL_SPEED_FIELDS.forEach(field => {
+              cfg[field.key] = cfg.other;
+            });
+            return { ok: true, cfg, mode: 'linked' };
+          }
+          return { ok: false, error: `[error] Поле "Остальное" должно быть числом больше ${MS_MIN} мс или значением "${OTHER_CUSTOM_TEXT}".` };
+        }
+      } else {
+        cfg.other = normalizeMsValue(otherParsed);
+        setDetailSpeeds(cfg.other);
+        DETAIL_SPEED_FIELDS.forEach(field => {
+          cfg[field.key] = cfg.other;
+        });
+        return { ok: true, cfg, mode: 'linked' };
+      }
+    }
+
+    const detailValues = getDetailSpeedValues(cfg);
+    if (detailValues.length) {
+      const avg = Math.round(detailValues.reduce((sum, x) => sum + x, 0) / detailValues.length);
+      cfg.other = normalizeMsValue(avg);
+    }
+    return { ok: true, cfg, mode: 'custom' };
+  }
+
+  function applySpeedConfig(strict = false) {
+    const parsed = collectSpeedConfig(strict);
+    if (!parsed.ok) {
+      if (strict && parsed.error) log(parsed.error);
+      return false;
+    }
+    const cfg = parsed.cfg;
+    const mode = parsed.mode || 'custom';
+    lastSpeedConfig = { ...cfg };
+    const stepDelay = cfg.other;
+    const swapDelay = cfg.swap;
+
+    player.setDelay(stepDelay);
+
+    if (window.VizScene && typeof window.VizScene.setBaseDelay === 'function') {
+      window.VizScene.setBaseDelay(swapDelay);
+    }
+
+    if (window.VizDUR) {
+      VizDUR.swap = cfg.swap / 1000;
+      VizDUR.move = cfg.move / 1000;
+      VizDUR.set = cfg.set / 1000;
+      VizDUR.range = cfg.range / 1000;
+      VizDUR.pulse = cfg.compare / 1000;
+    }
+
+    if (window.VizHL && typeof window.VizHL.setPulseProfile === 'function') {
+      window.VizHL.setPulseProfile({
+        compare: cfg.compare,
+        read: cfg.read,
+        write: cfg.write,
+        swap: Math.max(MS_MIN, Math.min(cfg.swap, cfg.compare)),
+        notFound: Math.max(MS_MIN * 2, cfg.other * 2)
+      });
+    } else if (window.VizScene && typeof window.VizScene.setHighlightDuration === 'function') {
+      window.VizScene.setHighlightDuration(cfg.other);
+    }
+
+    window.__algoDelayMs = stepDelay;
+    refreshOtherSpeedField(cfg, mode);
+    return true;
+  }
+
+  function toggleSpeedDetails(forceState) {
+    if (!speedDetailsPanel) return;
+    const show = typeof forceState === 'boolean'
+      ? forceState
+      : speedDetailsPanel.classList.contains('is-hidden');
+    speedDetailsPanel.classList.toggle('is-hidden', !show);
+    if (btnSpeedDetails) btnSpeedDetails.textContent = show ? 'Скрыть' : 'Подробнее';
+  }
+
+  function formatStepLabel(payload, index) {
+    const p = payload && typeof payload === 'object' ? payload : {};
+    const kind = p.kind ? String(p.kind) : 'step';
+
+    const step = (text) => `#${index} ${text}`;
+    const hasNum = (v) => Number.isFinite(v);
+    const valueText = (v) => hasNum(v) ? String(v) : '?';
+    const elemText = (v) => hasNum(v) ? `значение ${v}` : 'значение ?';
+    const pairText = (a, b) => `${elemText(a)} и ${elemText(b)}`;
+    const opText = (op) => {
+      const key = String(op || '').trim();
+      if (key === '==') return 'равно';
+      if (key === '!=') return 'не равно';
+      if (key === '>') return 'больше';
+      if (key === '>=') return 'больше или равно';
+      if (key === '<') return 'меньше';
+      if (key === '<=') return 'меньше или равно';
+      return key || 'сравнение';
+    };
+    const resultText = (v) => (v === true ? 'истина' : v === false ? 'ложь' : '?');
+    const tagText = (tag) => {
+      const key = String(tag || '').trim().toLowerCase();
+      if (key === 'key') return 'ключевой элемент';
+      if (key === 'min') return 'текущий минимум';
+      if (key === 'pivot') return 'опорный элемент (pivot)';
+      if (key === 'sorted') return 'элемент в отсортированной части';
+      if (key === 'mid') return 'середина диапазона';
+      if (key === 'found') return 'найденный элемент';
+      return key || 'метка';
+    };
+    const nodeStateText = (state) => {
+      const key = String(state || '').trim().toLowerCase();
+      if (key === 'start') return 'стартовая вершина';
+      if (key === 'end') return 'целевая вершина';
+      if (key === 'frontier') return 'в очереди/стеке';
+      if (key === 'visited') return 'уже посещена';
+      if (key === 'current') return 'текущая вершина';
+      if (key === 'path') return 'вершина итогового пути';
+      if (key === 'notfound') return 'поиск неуспешен';
+      return key || 'состояние';
+    };
+    const edgeStateText = (state) => {
+      const key = String(state || '').trim().toLowerCase();
+      if (key === 'active') return 'активное ребро (проверяем)';
+      if (key === 'path') return 'ребро итогового пути';
+      if (key === 'notfound') return 'ребро неуспешного поиска';
+      return key || 'ребро';
+    };
+    const previewArray = (arr) => {
+      if (!Array.isArray(arr)) return '';
+      const max = 6;
+      const part = arr.slice(0, max).join(', ');
+      return arr.length > max ? `${part}, ...` : part;
+    };
+
+    if (kind === 'compare') {
+      return step(`Сравнение: ${pairText(p.ai, p.bj)}.`);
+    }
+    if (kind === 'compareEx') {
+      const ai = valueText(p.ai);
+      const bj = valueText(p.bj);
+      const op = opText(p.op);
+      const res = resultText(p.result);
+      const constRole = timelineAlgo === 'binary'
+        ? 'цель'
+        : (timelineAlgo === 'quick' ? 'опорный элемент (pivot)' : 'константа');
+      if (Number.isInteger(p.i) && p.i >= 0 && p.j === -1) {
+        return step(`Сравнение: ${elemText(p.ai)} ${op} ${constRole} (${bj}) -> ${res}.`);
+      }
+      if (p.i === -1 && Number.isInteger(p.j) && p.j >= 0) {
+        return step(`Сравнение: ${constRole} (${ai}) ${op} ${elemText(p.bj)} -> ${res}.`);
+      }
+      return step(`Сравнение: ${elemText(p.ai)} ${op} ${elemText(p.bj)} -> ${res}.`);
+    }
+    if (kind === 'swap') {
+      let ai = p.ai;
+      let bj = p.bj;
+      if ((!hasNum(ai) || !hasNum(bj)) && Array.isArray(p.after) && Number.isInteger(p.i) && Number.isInteger(p.j)) {
+        ai = p.after[p.j];
+        bj = p.after[p.i];
+      }
+      return step(`Обмен: ${pairText(ai, bj)}.`);
+    }
+    if (kind === 'read') {
+      return step(`Чтение: берём ${elemText(p.value)}.`);
+    }
+    if (kind === 'move') {
+      if (hasNum(p.value)) return step(`Сдвиг: переносим ${elemText(p.value)} на новую позицию.`);
+      return step('Сдвиг элемента на новую позицию.');
+    }
+    if (kind === 'set') {
+      if (hasNum(p.old)) {
+        return step(`Запись: значение изменено с ${valueText(p.old)} на ${valueText(p.value)}.`);
+      }
+      return step(`Запись: устанавливаем значение ${valueText(p.value)}.`);
+    }
+    if (kind === 'setArray') {
+      if (Array.isArray(p.value)) {
+        return step(`Инициализация: структура обновлена (${p.value.length} эл.): ${previewArray(p.value)}.`);
+      }
+      return step('Инициализация: структура обновлена.');
+    }
+    if (kind === 'pivotAuto') {
+      const pivotVal = valueText(p.value);
+      return step(`Опорный элемент (pivot): выбрано значение ${pivotVal}.`);
+    }
+    if (kind === 'pivotChosen') {
+      const pivotVal = valueText(p.value);
+      return step(`Опорный элемент (pivot): выбираем значение ${pivotVal}.`);
+    }
+    if (kind === 'mark') {
+      return step(`Выделение: ${elemText(p.value)} — "${tagText(p.tag)}".`);
+    }
+    if (kind === 'unmark') {
+      return step(`Снятие выделения: ${elemText(p.value)}, метка "${tagText(p.tag)}".`);
+    }
+    if (kind === 'clearMarks') {
+      return p.tag
+        ? step(`Снятие выделений: убираем метку "${tagText(p.tag)}" у всех элементов.`)
+        : step('Снятие выделений: очищаем все метки элементов.');
+    }
+    if (kind === 'range') {
+      const rangeName = p.name ? String(p.name) : 'диапазон';
+      if (hasNum(p.leftValue) || hasNum(p.rightValue)) {
+        return step(`Диапазон "${rangeName}": от ${elemText(p.leftValue)} до ${elemText(p.rightValue)}.`);
+      }
+      return step(`Диапазон "${rangeName}": обновлён.`);
+    }
+    if (kind === 'rangeClear') {
+      const rangeName = p.name ? String(p.name) : 'диапазон';
+      return step(`Очистка диапазона "${rangeName}".`);
+    }
+    if (kind === 'clearRanges') {
+      return step('Очистка: удаляем все диапазоны.');
+    }
+    if (kind === 'ptr') {
+      const name = p.name ? String(p.name) : 'ptr';
+      if (hasNum(p.value)) return step(`Указатель "${name}": указывает на ${elemText(p.value)}.`);
+      return step(`Указатель "${name}": позиция обновлена.`);
+    }
+    if (kind === 'ptrClear') {
+      const name = p.name ? String(p.name) : 'ptr';
+      return step(`Указатель "${name}": скрываем.`);
+    }
+    if (kind === 'graphInit') {
+      return step(`Подготовка графа: старт "${p.start}", финиш "${p.end}".`);
+    }
+    if (kind === 'node') {
+      return step(`Вершина "${p.id}": ${nodeStateText(p.state)}.`);
+    }
+    if (kind === 'edge') {
+      return step(`Ребро "${p.from}" -> "${p.to}": ${edgeStateText(p.state)}.`);
+    }
+    if (kind === 'path') {
+      if (Array.isArray(p.nodes) && p.nodes.length) {
+        return step(`Путь найден: ${p.nodes.join(' -> ')}.`);
+      }
+      return step('Путь найден.');
+    }
+    if (kind === 'notFound') {
+      return step('Поиск завершён: результат не найден.');
+    }
+    if (kind === 'binaryInit') {
+      return step(`Бинарный поиск: начинаем, длина массива ${p.length}, цель ${p.target}.`);
+    }
+    if (kind === 'binaryClear') {
+      return step('Бинарный поиск: завершаем и очищаем служебные указатели.');
+    }
+    if (kind === 'note') {
+      const text = String(p.text || '').trim();
+      const swapNoop = text.match(/^swap\s+noop\s+i=j=(\d+)$/i);
+      if (swapNoop) {
+        return step(`Обмен пропущен: выбран один и тот же индекс ${swapNoop[1]}, массив не меняется.`);
+      }
+      return step(`Комментарий: ${text || 'шаг без текста'}.`);
+    }
+
+    return step(`Шаг "${kind}".`);
+  }
+
+  function setStepListAutoFollow(enabled) {
+    stepListAutoFollow = !!enabled;
+    if (stepList) {
+      stepList.classList.toggle('is-autofollow-paused', !stepListAutoFollow);
+    }
+  }
+
+  function markStepListProgrammaticScroll() {
+    stepListProgrammaticScroll = true;
+    if (stepListProgrammaticTimer) clearTimeout(stepListProgrammaticTimer);
+    stepListProgrammaticTimer = setTimeout(() => {
+      stepListProgrammaticScroll = false;
+      stepListProgrammaticTimer = null;
+    }, 60);
+  }
+
+  function isStepListNearBottom() {
+    if (!stepList) return true;
+    const threshold = 10;
+    return stepList.scrollTop + stepList.clientHeight >= stepList.scrollHeight - threshold;
+  }
+
+  function scrollStepListToActive(activeEl) {
+    if (!stepList || !activeEl || !stepListAutoFollow) return;
+
+    const viewTop = stepList.scrollTop;
+    const viewBottom = viewTop + stepList.clientHeight;
+    const itemTop = activeEl.offsetTop;
+    const itemBottom = itemTop + activeEl.offsetHeight;
+
+    if (itemTop >= viewTop + 8 && itemBottom <= viewBottom - 8) return;
+
+    const desiredTop = Math.max(0, itemTop - Math.floor(stepList.clientHeight * 0.35));
+    markStepListProgrammaticScroll();
+    stepList.scrollTo({ top: desiredTop, behavior: 'auto' });
+  }
+
+  function renderStepCorner() {
+    if (!stepCornerEls.length) return;
+
+    const total = timelineStepItems.length;
+    const current = Math.max(0, Math.min(total, timelineCursor));
+
+    stepCornerEls.forEach((box) => {
+      const curEl = box.querySelector('[data-viz-step-current]');
+      const totalEl = box.querySelector('[data-viz-step-total]');
+      const listEl = box.querySelector('[data-viz-step-list]');
+
+      if (curEl) curEl.textContent = String(current);
+      if (totalEl) totalEl.textContent = String(total);
+      if (!listEl) return;
+
+      listEl.innerHTML = '';
+      if (total === 0) {
+        listEl.textContent = 'Нет шагов';
+        return;
+      }
+
+      if (current <= 0) {
+        listEl.textContent = 'Ожидание старта анимации';
+        return;
+      }
+
+      const row = document.createElement('div');
+      row.className = 'viz-steps-corner-item is-active';
+      row.textContent = formatStepLabel(timelineStepItems[current - 1].payload, current);
+      listEl.appendChild(row);
+    });
+  }
+
+  function refreshStepCursorUi() {
+    if (stepCurrentEl) stepCurrentEl.textContent = String(timelineCursor);
+    if (stepRange) stepRange.value = String(timelineCursor);
+    if (stepList) {
+      const prev = stepList.querySelector('.step-item.is-active');
+      if (prev) prev.classList.remove('is-active');
+      const active = stepList.querySelector(`[data-step-index="${timelineCursor}"]`);
+      if (active) {
+        active.classList.add('is-active');
+        scrollStepListToActive(active);
+      }
+    }
+    renderStepCorner();
+  }
+
+  function renderStepTimeline() {
+    const total = timelineStepItems.length;
+    if (stepTotalEl) stepTotalEl.textContent = String(total);
+    if (stepRange) {
+      stepRange.min = '0';
+      stepRange.max = String(total);
+      stepRange.value = String(Math.min(timelineCursor, total));
+      stepRange.disabled = total === 0;
+    }
+    if (!stepList) return;
+    stepList.innerHTML = '';
+    if (total === 0) return;
+    const frag = document.createDocumentFragment();
+    for (let i = 0; i < total; i++) {
+      const btn = document.createElement('button');
+      const idx = i + 1;
+      btn.type = 'button';
+      btn.className = 'step-item';
+      btn.dataset.stepIndex = String(idx);
+      btn.textContent = formatStepLabel(timelineStepItems[i].payload, idx);
+      if (idx === timelineCursor) btn.classList.add('is-active');
+      frag.appendChild(btn);
+    }
+    stepList.appendChild(frag);
+    renderStepCorner();
+  }
+
+  function resetVisualizationToTimelineStart() {
+    const isGraph = timelineAlgo === 'bfs' || timelineAlgo === 'dfs';
+    if (isGraph) {
+      if (window.GraphEditor && window.GraphEditor.clearStates) {
+        window.GraphEditor.clearStates();
+      }
+      return;
+    }
+    if (window.VizScene && window.VizScene.setCurrentArray) {
+      window.VizScene.setCurrentArray(Array.isArray(timelineInitialArray) ? timelineInitialArray.slice() : []);
+    } else if (window.setCurrentArray) {
+      window.setCurrentArray(Array.isArray(timelineInitialArray) ? timelineInitialArray.slice() : []);
+    }
+  }
+
+  function processPlaybackItem(item, options = {}) {
+    const seeking = !!options.seeking;
     if (!item) return;
     if (item.type === 'step') {
       const p = item.payload && item.payload.payload ? item.payload.payload : item.payload;
-      try { window.handleStepEvent && window.handleStepEvent(p); } catch {}
+      let extraDelay = null;
+      try { extraDelay = window.handleStepEvent && window.handleStepEvent(p); } catch {}
+      if (!seeking && !timelineUiFrozen) {
+        timelineCursor = Math.min(timelineStepItems.length, timelineCursor + 1);
+        refreshStepCursorUi();
+      }
       if (p && p.kind === 'swap') {
         const ms = (window.VizScene && typeof VizScene.getSwapDelayMs === 'function')
           ? VizScene.getSwapDelayMs()
           : 700;
+        if (Number.isFinite(extraDelay)) return Math.max(ms, extraDelay);
         return ms;
       }
-    }  else if (item.type === 'stderr' && typeof item.payload === 'string') {
+      if (Number.isFinite(extraDelay)) return extraDelay;
+      return;
+    }
+    if (!seeking && item.type === 'stderr' && typeof item.payload === 'string') {
       log('[stderr] ' + item.payload);
     }
-  });
+  }
 
-  const btnPlay = document.getElementById('play');
-  const btnPause = document.getElementById('pause');
-  const btnReset = document.getElementById('reset');
-  const btnStep = document.getElementById('stepOnce');
-  const inpDelay = document.getElementById('delay');
-  const chkAutoplay = document.getElementById('autoplay');
+  const player = new LogPlayer((item) => processPlaybackItem(item));
+
+  function updatePlayPauseLabel(playing) {
+    if (!btnPlayPause) return;
+    btnPlayPause.textContent = playing ? 'Пауза' : 'Воспроизвести';
+  }
+  player.onStateChange = updatePlayPauseLabel;
+  updatePlayPauseLabel(false);
+
+  function rebuildQueueFromCursor() {
+    if (!timelineStepItems.length) {
+      player.setQueue([], 0);
+      return;
+    }
+    const rest = timelineStepItems.slice(timelineCursor);
+    player.setQueue(rest, timelineCursor);
+  }
+
+  function seekToStep(stepIndex) {
+    const total = timelineStepItems.length;
+    const next = Math.max(0, Math.min(total, Number.isFinite(stepIndex) ? Math.floor(stepIndex) : 0));
+    player.pause();
+    updatePlaybackState(false);
+    resetVisualizationToTimelineStart();
+    timelineUiFrozen = true;
+    try {
+      if (window.VizScene && window.VizScene.setSeekMode) window.VizScene.setSeekMode(true);
+      if (window.VizScene && window.VizScene.setAnimationSpeed) window.VizScene.setAnimationSpeed(1000);
+      if (window.VizScene && window.VizScene.setHighlightDuration) window.VizScene.setHighlightDuration(1);
+      if (window.VizScene && window.VizScene.setBaseDelay) window.VizScene.setBaseDelay(0);
+      for (let i = 0; i < next; i++) {
+        processPlaybackItem(timelineStepItems[i], { seeking: true });
+      }
+    } finally {
+      if (window.VizScene && window.VizScene.setSeekMode) window.VizScene.setSeekMode(false);
+      timelineUiFrozen = false;
+      applySpeedConfig();
+    }
+    timelineCursor = next;
+    refreshStepCursorUi();
+    rebuildQueueFromCursor();
+  }
+
+  function clearTimeline() {
+    timelineStepItems = [];
+    timelineInitialArray = [];
+    timelineAlgo = getAlgoKey();
+    timelineCursor = 0;
+    setStepListAutoFollow(true);
+    player.stop();
+    updatePlaybackState(false);
+    renderStepTimeline();
+    refreshStepCursorUi();
+  }
+
+  function loadTimeline(stepPayloads, initialArray, algoName) {
+    timelineStepItems = (stepPayloads || []).map(p => ({ type: 'step', payload: p }));
+    timelineInitialArray = Array.isArray(initialArray) ? initialArray.slice() : [];
+    timelineAlgo = algoName || getAlgoKey();
+    timelineCursor = 0;
+    setStepListAutoFollow(true);
+    renderStepTimeline();
+    refreshStepCursorUi();
+    resetVisualizationToTimelineStart();
+    rebuildQueueFromCursor();
+  }
+
+  function replayTimeline() {
+    if (!timelineStepItems.length) return;
+    seekToStep(0);
+    player.play();
+    updatePlaybackState(true);
+  }
 
   // Keep viz playback state in sync with the player
   function updatePlaybackState(playing) {
+    updatePlayPauseLabel(!!playing);
     if (window.VizScene && window.VizScene.setPlaybackState) {
       window.VizScene.setPlaybackState(playing);
     }
   }
 
-  const BASE_STEP_MS = 500;
-  function applySpeed(speedValue) {
-    const raw = Number.isFinite(speedValue) ? speedValue : 1;
-    const speed = Math.min(3, Math.max(0.25, raw));
-    const stepDelay = Math.round(BASE_STEP_MS / speed);
-    player.setDelay(stepDelay);
-    if (window.VizScene && typeof window.VizScene.setBaseDelay === 'function') {
-      window.VizScene.setBaseDelay(stepDelay);
-    }
-    if (window.VizScene && typeof window.VizScene.setAnimationSpeed === 'function') {
-      window.VizScene.setAnimationSpeed(speed);
-    }
-    if (window.VizScene && typeof window.VizScene.setHighlightDuration === 'function') {
-      const highlightMs = Math.max(200, Math.round(stepDelay * 0.7));
-      window.VizScene.setHighlightDuration(highlightMs);
-    }
-    window.__algoDelayMs = stepDelay;
-  }
-
   // Playback controls
-  btnPlay && btnPlay.addEventListener('click', () => { 
-    player.play(); 
-    updatePlaybackState(true);
-  });
-  
-  btnPause && btnPause.addEventListener('click', () => { 
-    player.pause(); 
-    updatePlaybackState(false);
+  btnPlayPause && btnPlayPause.addEventListener('click', () => {
+    if (player.isPlaying) {
+      player.pause();
+      updatePlaybackState(false);
+      return;
+    }
+    player.play();
+    updatePlaybackState(player.isPlaying);
   });
   
   btnReset && btnReset.addEventListener('click', () => { 
-    player.stop(); 
+    if (timelineStepItems.length) {
+      seekToStep(0);
+      return;
+    }
+    player.stop();
     updatePlaybackState(false);
     // Reset visualization to the initial array
     if (window.VizScene && window.VizScene.setCurrentArray) {
@@ -568,18 +1268,95 @@ ${printLine}
     }
   });
 
-  btnStep && btnStep.addEventListener('click', () => player.stepOnce());
-  inpDelay && inpDelay.addEventListener('input', () => {
-    const v = parseFloat(inpDelay.value || '1');
-    applySpeed(Number.isFinite(v) ? v : 1);
+  btnReplay && btnReplay.addEventListener('click', () => {
+    replayTimeline();
   });
-  (function initDelay(){
-    const v = inpDelay ? parseFloat(inpDelay.value || '1') : 1;
-    applySpeed(Number.isFinite(v) ? v : 1);
+
+  btnStep && btnStep.addEventListener('click', () => player.stepOnce());
+  inpSpeedSwap && inpSpeedSwap.addEventListener('input', () => {
+    applySpeedConfig(false);
+  });
+  inpSpeedOther && inpSpeedOther.addEventListener('input', () => {
+    const rawText = (typeof inpSpeedOther.value === 'string') ? inpSpeedOther.value.trim() : '';
+    if (!rawText) {
+      // Allow the user to fully clear the field while editing.
+      // Validation is enforced on Run (strict mode).
+      return;
+    }
+    const rawOther = parseSpeedInput(inpSpeedOther);
+    if (Number.isFinite(rawOther) && rawOther > 0) {
+      syncDetailSpeedsFromOther();
+      applySpeedConfig(false);
+      return;
+    }
+    if (isOtherCustomValue(rawText)) {
+      applySpeedConfig(false);
+    }
+  });
+  [inpSpeedCompare, inpSpeedRead, inpSpeedWrite, inpSpeedMove, inpSpeedSet, inpSpeedRange].forEach(el => {
+    if (!el) return;
+    el.addEventListener('input', () => {
+      setOtherSpeedCustom();
+      applySpeedConfig(false);
+    });
+  });
+  btnSpeedDetails && btnSpeedDetails.addEventListener('click', () => {
+    toggleSpeedDetails();
+  });
+  stepRange && stepRange.addEventListener('input', () => {
+    const next = parseInt(stepRange.value || '0', 10);
+    seekToStep(Number.isFinite(next) ? next : 0);
+  });
+  stepList && stepList.addEventListener('click', (e) => {
+    const btn = e.target && e.target.closest ? e.target.closest('[data-step-index]') : null;
+    if (!btn) return;
+    const next = parseInt(btn.dataset.stepIndex || '0', 10);
+    seekToStep(Number.isFinite(next) ? next : 0);
+  });
+  if (stepList) {
+    const disableAutoFollow = () => {
+      if (stepListProgrammaticScroll) return;
+      setStepListAutoFollow(false);
+    };
+
+    stepList.addEventListener('wheel', disableAutoFollow, { passive: true });
+    stepList.addEventListener('touchmove', disableAutoFollow, { passive: true });
+    stepList.addEventListener('focusout', disableAutoFollow);
+    stepList.addEventListener('scroll', () => {
+      if (stepListProgrammaticScroll) return;
+      if (isStepListNearBottom()) {
+        setStepListAutoFollow(true);
+      } else {
+        setStepListAutoFollow(false);
+      }
+    }, { passive: true });
+  }
+  setStepListAutoFollow(true);
+  (function initSpeedControls(){
+    if (inpSpeedSwap) inpSpeedSwap.value = String(DEFAULT_SWAP_MS);
+    if (inpSpeedOther) inpSpeedOther.value = String(DEFAULT_OTHER_MS);
+    [inpSpeedCompare, inpSpeedRead, inpSpeedWrite, inpSpeedMove, inpSpeedSet, inpSpeedRange].forEach(el => {
+      if (el) el.value = String(DEFAULT_OTHER_MS);
+    });
+    toggleSpeedDetails(false);
+    applySpeedConfig(true);
   })();
 
   let currentRunToken = null;
   const runnerBase = (window.RUNNER_BASE || '').replace(/\/+$/, '');
+
+  btnExportRawLogs && btnExportRawLogs.addEventListener('click', () => {
+    if (!lastServerRawLogs) {
+      log('[error] Нет raw логов для экспорта. Сначала выполните запуск.');
+      return;
+    }
+    const ts = new Date().toISOString().replace(/[:.]/g, '-');
+    const algo = sanitizeFilePart(lastServerAlgo);
+    const submission = lastServerSubmissionId ? `submission-${sanitizeFilePart(lastServerSubmissionId)}` : 'submission';
+    const fileName = `raw-logs-${algo}-${submission}-${ts}.log`;
+    downloadTextFile(fileName, lastServerRawLogs);
+    log(`[raw logs] exported: ${fileName}`);
+  });
 
   function buildInputPayload(algo) {
     const key = algo || getAlgoKey();
@@ -649,23 +1426,107 @@ ${printLine}
     return true;
   }
 
-  function enqueueOutput(output) {
+  function parseStepPayloads(output, algoName) {
+    const steps = [];
+    const isQuick = String(algoName || '').toLowerCase() === 'quick';
+    const recentReads = [];
+    let lastPivotValue = null;
+    let lastPivotIndex = null;
+
+    function parseInnerStep(rawLine) {
+      if (!rawLine) return null;
+      if (rawLine.startsWith('__STEP__')) {
+        const json = rawLine.slice('__STEP__'.length);
+        const parsed = JSON.parse(json);
+        return parsed && parsed.payload ? parsed.payload : parsed;
+      }
+      const env = tryParseEnvelope(rawLine);
+      if (env && env.type === 'step' && env.payload && typeof env.payload === 'object') {
+        return env.payload;
+      }
+      return null;
+    }
+
+    function extractQuickCompareInfo(step) {
+      if (!step || step.kind !== 'compareEx') return null;
+      const leftIsConst = step.i === -1;
+      const rightIsConst = step.j === -1;
+      if (!leftIsConst && !rightIsConst) return null;
+      if (leftIsConst === rightIsConst) return null;
+      return {
+        comparedIndex: leftIsConst ? step.j : step.i,
+        constValue: leftIsConst ? step.ai : step.bj
+      };
+    }
+
+    function inferPivotIndex(constValue, comparedIndex) {
+      for (let i = recentReads.length - 1; i >= 0; i--) {
+        const r = recentReads[i];
+        if (r.value !== constValue) continue;
+        if (!Number.isInteger(comparedIndex) || r.index !== comparedIndex) return r.index;
+      }
+      for (let i = recentReads.length - 1; i >= 0; i--) {
+        const r = recentReads[i];
+        if (r.value === constValue) return r.index;
+      }
+      return null;
+    }
+
+    function pushStep(step) {
+      if (!step || typeof step !== 'object') return;
+
+      if (isQuick) {
+        // For quick-sort with constant pivot comparisons, keep compareEx only.
+        // The plain compare step is technical and has no separate animation.
+        if (step.kind === 'compare' && (step.i === -1 || step.j === -1)) {
+          return;
+        }
+
+        if (step.kind === 'setArray') {
+          recentReads.length = 0;
+          lastPivotValue = null;
+          lastPivotIndex = null;
+        }
+
+        if (step.kind === 'read' && Number.isInteger(step.i)) {
+          recentReads.push({ index: step.i, value: step.value });
+          if (recentReads.length > 12) recentReads.shift();
+        }
+
+        const compareInfo = extractQuickCompareInfo(step);
+        if (compareInfo) {
+          const constValue = compareInfo.constValue;
+          const pivotIndex = inferPivotIndex(constValue, compareInfo.comparedIndex);
+          const pivotChanged =
+            constValue !== lastPivotValue ||
+            (Number.isInteger(pivotIndex) && pivotIndex !== lastPivotIndex);
+
+          if (pivotChanged) {
+            steps.push({
+              kind: 'pivotAuto',
+              index: Number.isInteger(pivotIndex) ? pivotIndex : null,
+              value: constValue
+            });
+            lastPivotValue = constValue;
+            if (Number.isInteger(pivotIndex)) lastPivotIndex = pivotIndex;
+          }
+        }
+      }
+
+      steps.push(step);
+    }
+
     const lines = String(output || '').split(/\r?\n/);
     for (const line of lines) {
       if (!line) continue;
-      if (line.startsWith('__STEP__')) {
-        const json = line.slice('__STEP__'.length);
-        try {
-          const parsed = JSON.parse(json);
-          const inner = parsed && parsed.payload ? parsed.payload : parsed;
-          player.enqueue({ type: 'step', payload: inner });
-        } catch {
-          player.enqueue({ type: 'stderr', payload: 'STEP parse error' });
-        }
-      } else {
-        player.enqueue({ type: 'stdout', payload: line });
+      try {
+        const inner = parseInnerStep(line);
+        pushStep(inner);
+      } catch {
+        log('[stderr] STEP parse error');
       }
     }
+    return steps;
   }
 
   async function pollStatus(statusUrl, token) {
@@ -682,7 +1543,7 @@ ${printLine}
             setStatus(lastState);
             handleStatusStage(lastState);
           }
-          if (s && (s.state === 'Completed' || s.state === 'Failed')) {
+          if (s && (s.state === 'Completed' || s.state === 'Failed' || s.state === 'Cancelled')) {
             stopTimer();
             return s;
           }
@@ -692,33 +1553,57 @@ ${printLine}
     }
   }
 
+  async function requestServerCancel(runToken) {
+    if (!runToken || !runToken.submissionId) return false;
+    try {
+      const cancelUrl = `${runnerBase}/api/submissions/${runToken.submissionId}/cancel`;
+      const res = await fetch(cancelUrl, { method: 'POST' });
+      if (!res.ok) {
+        log(`HTTP ${res.status}: failed to cancel`);
+        return false;
+      }
+      return true;
+    } catch (err) {
+      log('[cancel error] ' + (err && err.message ? err.message : String(err)));
+      return false;
+    }
+  }
+
   const btnStop = document.getElementById('stop');
-  btnStop && btnStop.addEventListener('click', () => {
-    if (currentRunToken) currentRunToken.cancelled = true;
+  btnStop && btnStop.addEventListener('click', async () => {
+    const token = currentRunToken;
+    if (!token) return;
+    token.cancelled = true;
     log('[cancel requested]');
+    const cancelled = await requestServerCancel(token);
+    if (cancelled) {
+      log('[cancel accepted]');
+    }
     setStatus('Cancelled');
     stopTimer();
   });
 
   document.getElementById('run').addEventListener('click', async () => {
     if (!editor) return;
+    if (!applySpeedConfig(true)) return;
 
     if (currentRunToken) currentRunToken.cancelled = true;
-    const token = { cancelled: false };
+    const token = { cancelled: false, submissionId: null };
     currentRunToken = token;
-    setStatus('Submitting');
-    resetStageDurations();
-    startTimer();
 
     const algoName = getAlgoKey();
     if (!validateBeforeRun(algoName)) return;
+    setStatus('Submitting');
+    resetStageDurations();
+    startTimer();
     const codeFromEditor = editor.getValue();
     const pageArray = window.getCurrentArray ? window.getCurrentArray() : [];
     const sourceToSend = buildSourceForRun(codeFromEditor, pageArray, algoName);
     const inputPayload = buildInputPayload(algoName);
 
     if (consoleEl) consoleEl.textContent = '';
-    player.stop();
+    clearTimeline();
+    resetRawExportState();
 
     try {
       const submitUrl = `${runnerBase}/api/submissions`;
@@ -736,6 +1621,7 @@ ${printLine}
 
       const created = await r.json();
       const id = created.id;
+      token.submissionId = id;
       const statusUrl = created.statusUrl
         ? (created.statusUrl.startsWith('http')
           ? created.statusUrl
@@ -746,8 +1632,12 @@ ${printLine}
       setStatus('Queued');
       handleStatusStage('Queued');
 
-      await pollStatus(statusUrl, token);
+      const finalStatus = await pollStatus(statusUrl, token);
       if (token.cancelled) return;
+      if (finalStatus && finalStatus.state === 'Cancelled') {
+        stopTimer();
+        return;
+      }
 
       const resultUrl = `${runnerBase}/api/submissions/${id}`;
       const resultRes = await fetch(resultUrl, { cache: 'no-store' });
@@ -759,13 +1649,18 @@ ${printLine}
       }
 
       const result = await resultRes.json();
+      rememberRawServerLogs(result && typeof result.output === 'string' ? result.output : '', id, algoName);
       if (result && result.error) {
-        player.enqueue({ type: 'stderr', payload: result.error });
+        log('[stderr] ' + result.error);
       }
-      enqueueOutput(result && result.output ? result.output : '');
+      const stepPayloads = parseStepPayloads(result && result.output ? result.output : '', algoName);
+      loadTimeline(stepPayloads, pageArray, algoName);
 
       const auto = chkAutoplay ? !!chkAutoplay.checked : true;
-      if (auto) player.play();
+      if (auto && stepPayloads.length) {
+        player.play();
+        updatePlaybackState(true);
+      }
       stopTimer();
     } catch (err) {
       log('Run error: ' + (err && err.message ? err.message : String(err)));
@@ -774,7 +1669,7 @@ ${printLine}
     }
   });
 
+  resetRawExportState();
+  clearTimeline();
   setStatus('Idle');
 })();
-
-

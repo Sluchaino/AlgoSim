@@ -207,15 +207,25 @@
       return;
     }
 
-    if (p.kind === 'compare' || p.kind === 'compareEx') {
-      if (window.VizHL) VizHL.pulseCompare(p.i, p.j);
+    if (p.kind === 'compare') {
+      return;
+    }
+
+    if (p.kind === 'compareEx') {
+      const i = p.i;
+      const j = p.j;
+      if (Number.isInteger(i) && Number.isInteger(j)) {
+        const pulseMs = (window.VizDUR ? (VizDUR.pulse || 0.25) : 0.25) * 1000;
+        if (window.VizHL) VizHL.pulseCompare(i, j);
+        updateInsertionSortedFromCompare(i, j);
+        return Math.round(pulseMs);
+      }
       updateInsertionSortedFromCompare(p.i, p.j);
       return;
     }
 
     if (p.kind === 'read') {
-      if (window.VizHL) VizHL.pulseRead(p.i);
-      return;
+      return ctx.handleGenericEvent(p);
     }
 
     if (p.kind === 'swap' && Number.isInteger(p.i) && Number.isInteger(p.j)) {

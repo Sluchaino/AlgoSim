@@ -1,3 +1,4 @@
+using System;
 using System.Collections.Generic;
 using System.Text;
 using System.Text.Json;
@@ -126,6 +127,14 @@ namespace AlgoPlatform.Infrastructure.RabbitMQ.HostedServices
 
                     foreach (var submission in waiting.DistinctBy(x => x.Id))
                     {
+                        if (string.Equals(submission.Status, "Cancelled", StringComparison.OrdinalIgnoreCase))
+                        {
+                            await status.SetAsync(
+                                submission.Id,
+                                new SubmissionStatus("Cancelled", 100, "Cancelled by user"));
+                            continue;
+                        }
+
                         submission.ArtifactHash = result.ArtifactHash;
                         submission.Status = "Running";
                         submission.Error = null;
@@ -150,6 +159,14 @@ namespace AlgoPlatform.Infrastructure.RabbitMQ.HostedServices
 
                     foreach (var submission in waiting.DistinctBy(x => x.Id))
                     {
+                        if (string.Equals(submission.Status, "Cancelled", StringComparison.OrdinalIgnoreCase))
+                        {
+                            await status.SetAsync(
+                                submission.Id,
+                                new SubmissionStatus("Cancelled", 100, "Cancelled by user"));
+                            continue;
+                        }
+
                         submission.ArtifactHash = result.ArtifactHash;
                         submission.Status = "Failed";
                         submission.Error = finalError;

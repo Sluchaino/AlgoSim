@@ -150,6 +150,10 @@
   color: #86efac;
 }
 
+.run-status[data-state="Cancelled"] #run-status-text {
+  color: #fbbf24;
+}
+
 .run-status[data-state="Running"] #run-status-text,
 .run-status[data-state="Compiling"] #run-status-text,
 .run-status[data-state="Queued"] #run-status-text,

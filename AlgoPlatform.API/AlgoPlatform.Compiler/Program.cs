@@ -4,10 +4,18 @@ using AlgoPlatform.Compiler.Execution;
 using AlgoPlatform.Compiler.RabbitMQ;
 using AlgoPlatform.Compiler.Storage;
 using RabbitMQ.Client;
+using System.Diagnostics;
 
 var builder = Host.CreateApplicationBuilder(args);
 
 var options = builder.Configuration.GetSection("Compiler").Get<CompilerOptions>() ?? new CompilerOptions();
+var requestedRuntime = options.ContainerRuntime;
+var runtimeFallback = false;
+if (!string.IsNullOrWhiteSpace(requestedRuntime) && !DockerRuntimeExists(requestedRuntime))
+{
+    options.ContainerRuntime = string.Empty;
+    runtimeFallback = true;
+}
 builder.Services.AddSingleton(options);
 builder.Services.AddSingleton<DockerCliCodeCompiler>();
 
@@ -57,6 +65,12 @@ var host = builder.Build();
 var startupLogger = host.Services.GetRequiredService<ILogger<Program>>();
 var startupRuntime = string.IsNullOrWhiteSpace(options.ContainerRuntime) ? "default" : options.ContainerRuntime;
 startupLogger.LogInformation("Compiler starting. Container runtime: {Runtime}", startupRuntime);
+if (runtimeFallback)
+{
+    startupLogger.LogWarning(
+        "Requested runtime '{Runtime}' is unavailable. Fallback to default runtime is active.",
+        requestedRuntime);
+}
 startupLogger.LogInformation(
     "S3 config: endpoint={Endpoint}, accessKey={AccessKey}, usePathStyle={UsePathStyle}",
     builder.Configuration["S3:Endpoint"],
@@ -64,3 +78,32 @@ startupLogger.LogInformation(
     builder.Configuration["S3:UsePathStyle"]);
 
 host.Run();
+
+static bool DockerRuntimeExists(string runtimeName)
+{
+    try
+    {
+        var psi = new ProcessStartInfo("docker", "info --format \"{{json .Runtimes}}\"")
+        {
+            RedirectStandardOutput = true,
+            RedirectStandardError = true,
+            UseShellExecute = false,
+            CreateNoWindow = true
+        };
+
+        using var p = Process.Start(psi);
+        if (p is null) return false;
+
+        var output = p.StandardOutput.ReadToEnd();
+        p.WaitForExit(5000);
+
+        if (p.ExitCode != 0) return false;
+        if (string.IsNullOrWhiteSpace(output)) return false;
+
+        return output.Contains($"\"{runtimeName}\"", StringComparison.OrdinalIgnoreCase);
+    }
+    catch
+    {
+        return false;
+    }
+}

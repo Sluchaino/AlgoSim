@@ -160,6 +160,9 @@ namespace AlgoPlatform.Infrastructure
                 var runQueue = configuration["RabbitMQ:RunQueue"] ?? "runs";
                 DeclareQueueWithRetry(runQueue);
 
+                var cancelQueue = configuration["RabbitMQ:CancelQueue"] ?? "run-cancel";
+                DeclareQueueWithRetry(cancelQueue);
+
                 var resultQueue = configuration["RabbitMQ:ResultQueue"] ?? "run-results";
                 DeclareQueueWithRetry(resultQueue);
 
@@ -185,6 +188,10 @@ namespace AlgoPlatform.Infrastructure
                 new RabbitMqRunPublisher(
                     sp.GetRequiredService<IChannel>(),
                     configuration["RabbitMQ:RunQueue"] ?? "runs"));
+            services.AddSingleton<IRunCancelQueuePublisher>(sp =>
+                new RabbitMqRunCancelPublisher(
+                    sp.GetRequiredService<IChannel>(),
+                    configuration["RabbitMQ:CancelQueue"] ?? "run-cancel"));
 
             if (includeWorker)
             {

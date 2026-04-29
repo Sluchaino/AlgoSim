@@ -39,6 +39,41 @@
   const elShuffle = document.getElementById('shuffle');
   const elClear   = document.getElementById('clear');
   const elReset   = document.getElementById('reset-array');
+  const elCopy    = document.getElementById('copy-array');
+
+  const toArrayText = (arr) =>
+    (Array.isArray(arr) ? arr : [])
+      .map(v => Number.isFinite(+v) ? Math.trunc(+v) : 0)
+      .join(', ');
+
+  const copyTextToClipboard = async (text) => {
+    const raw = String(text ?? '');
+    if (navigator.clipboard && window.isSecureContext) {
+      await navigator.clipboard.writeText(raw);
+      return true;
+    }
+    const ta = document.createElement('textarea');
+    ta.value = raw;
+    ta.setAttribute('readonly', 'readonly');
+    ta.style.position = 'fixed';
+    ta.style.opacity = '0';
+    ta.style.left = '-9999px';
+    document.body.appendChild(ta);
+    ta.focus();
+    ta.select();
+    let ok = false;
+    try { ok = document.execCommand('copy'); } catch { ok = false; }
+    ta.remove();
+    if (!ok) throw new Error('Clipboard copy failed');
+    return true;
+  };
+
+  const pulseButtonText = (btn, text, ms = 1300) => {
+    if (!btn) return;
+    const prev = btn.textContent;
+    btn.textContent = text;
+    setTimeout(() => { btn.textContent = prev; }, ms);
+  };
 
   elApply && elApply.addEventListener('click', () => {
     const val = document.getElementById('manual')?.value || '';
@@ -62,6 +97,20 @@
   elClear && elClear.addEventListener('click', () => setArr([]));
   elReset && elReset.addEventListener('click', () => {
     if (window.resetArrayToBase) window.resetArrayToBase();
+  });
+  elCopy && elCopy.addEventListener('click', async () => {
+    const cur = window.getCurrentArray ? window.getCurrentArray() : [];
+    if (!Array.isArray(cur) || cur.length === 0) {
+      pulseButtonText(elCopy, 'Массив пуст');
+      return;
+    }
+    const text = toArrayText(cur);
+    try {
+      await copyTextToClipboard(text);
+      pulseButtonText(elCopy, 'Скопировано');
+    } catch {
+      pulseButtonText(elCopy, 'Ошибка копирования');
+    }
   });
 
   window.ensureBinarySorted = () => {

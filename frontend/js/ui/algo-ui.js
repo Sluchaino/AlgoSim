@@ -7,6 +7,7 @@
   const binaryOnly = Array.from(document.querySelectorAll('[data-binary-only]'));
   const shuffleBtn = document.getElementById('shuffle');
   const playbackControls = document.getElementById('playback-controls');
+  const stepsPanel = document.getElementById('steps-panel');
   const playbackAnchorArray = document.getElementById('playback-controls-anchor-array');
   const playbackAnchorGraph = document.getElementById('playback-controls-anchor-graph');
   const modeInputs = Array.from(document.querySelectorAll('input[name="algo-mode"]'));
@@ -34,6 +35,7 @@
         : 'Авто-анимация: TrackedList и обычные операции';
     }
     try { localStorage.setItem(modeStorageKey, currentMode); } catch {}
+    updateLegendForAlgo(getAlgoKey());
   }
 
   function initMode() {
@@ -80,41 +82,37 @@
   function applyAlgo(algo) {
     const isGraph = algo === 'bfs' || algo === 'dfs';
     const isBinary = algo === 'binary';
-
     captureBaseArray();
     if (currentAlgo && currentAlgo !== algo) {
       saveArrayState(currentAlgo);
     }
-
     tabs.forEach(t => {
       const active = t.dataset.algo === algo;
       t.classList.toggle('active', active);
       if (active) t.setAttribute('aria-current', 'page');
       else t.removeAttribute('aria-current');
     });
-
     if (arrayPanel) arrayPanel.classList.toggle('is-hidden', isGraph);
     if (graphPanel) graphPanel.classList.toggle('is-hidden', !isGraph);
     theoryBlocks.forEach(b => b.classList.toggle('is-hidden', b.dataset.theory !== algo));
-
     binaryOnly.forEach(el => el.classList.toggle('is-hidden', !isBinary));
-
     if (shuffleBtn) {
       shuffleBtn.disabled = isBinary;
       shuffleBtn.title = isBinary ? 'Для бинарного поиска массив должен быть отсортирован' : '';
     }
-
     if (playbackControls) {
       const target = isGraph ? playbackAnchorGraph : playbackAnchorArray;
       if (target && playbackControls.parentNode !== target) {
         target.appendChild(playbackControls);
       }
+      if (target && stepsPanel && stepsPanel.parentNode !== target) {
+        target.appendChild(stepsPanel);
+      }
     }
-
+    updateLegendForAlgo(algo);
     if (!isGraph) restoreArrayState(algo);
     if (isBinary && window.ensureBinarySorted) window.ensureBinarySorted();
     captureBaseForAlgo(algo);
-
     currentAlgo = algo;
   }
 
@@ -155,5 +153,31 @@
   }
 
   applyAlgo(getAlgoKey());
-})();
 
+  function updateLegendForAlgo(algo) {
+    const isGraph = algo === 'bfs' || algo === 'dfs';
+    const mode = currentMode;
+    const arrayLegend = document.querySelector('[data-legend-scope="array"]');
+    const graphLegend = document.querySelector('[data-legend-scope="graph"]');
+
+    const cfg = window.LEGEND_CONFIG || { auto: {}, controlled: {}, graph: {} };
+
+    if (arrayLegend) {
+      const keys = (mode === 'controlled' ? cfg.controlled : cfg.auto)[algo] || [];
+      const items = arrayLegend.querySelectorAll('[data-legend-item]');
+      items.forEach(el => {
+        const key = el.dataset.legendItem;
+        el.classList.toggle('is-hidden', isGraph || !keys.includes(key));
+      });
+    }
+
+    if (graphLegend) {
+      const keys = (cfg.graph || {})[algo] || [];
+      const items = graphLegend.querySelectorAll('[data-legend-item]');
+      items.forEach(el => {
+        const key = el.dataset.legendItem;
+        el.classList.toggle('is-hidden', !isGraph || !keys.includes(key));
+      });
+    }
+  }
+})();

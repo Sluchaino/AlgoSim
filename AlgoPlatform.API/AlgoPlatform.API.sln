@@ -1,4 +1,4 @@
-
+п»ї
 Microsoft Visual Studio Solution File, Format Version 12.00
 # Visual Studio Version 18
 VisualStudioVersion = 18.0.11222.15
@@ -11,7 +11,7 @@ Project("{FAE04EC0-301F-11D3-BF4B-00C04F79EFBC}") = "AlgoPlatform.Domain", "Algo
 EndProject
 Project("{FAE04EC0-301F-11D3-BF4B-00C04F79EFBC}") = "AlgoPlatform.Infrastructure", "AlgoPlatform.Infrastructure\AlgoPlatform.Infrastructure.csproj", "{12B5838D-456D-43B5-9FEC-DEAE1CFF5836}"
 EndProject
-Project("{2150E333-8FDC-42A3-9474-1A3956D46DE8}") = "Элементы решения", "Элементы решения", "{F3CCB8E5-24C8-4434-BB5C-1A472D90B272}"
+Project("{2150E333-8FDC-42A3-9474-1A3956D46DE8}") = "Р­Р»РµРјРµРЅС‚С‹ СЂРµС€РµРЅРёСЏ", "Р­Р»РµРјРµРЅС‚С‹ СЂРµС€РµРЅРёСЏ", "{F3CCB8E5-24C8-4434-BB5C-1A472D90B272}"
 	ProjectSection(SolutionItems) = preProject
 		.dockerignore = .dockerignore
 		docker-compose.yml = docker-compose.yml
@@ -26,7 +26,7 @@ Project("{FAE04EC0-301F-11D3-BF4B-00C04F79EFBC}") = "AlgoPlatform.Worker", "Algo
 EndProject
 Project("{FAE04EC0-301F-11D3-BF4B-00C04F79EFBC}") = "AlgoPlatform.Runner", "AlgoPlatform.Runner\AlgoPlatform.Runner.csproj", "{C21AA8AE-9E4E-4F80-8547-419FE9096E27}"
 EndProject
-Project("{FAE04EC0-301F-11D3-BF4B-00C04F79EFBC}") = "AlgoPlatform.Compiler", "AlgoPlatform.Compiler\\AlgoPlatform.Compiler.csproj", "{B3724CF1-5972-4260-8DCE-274EDF1FBF4D}"
+Project("{FAE04EC0-301F-11D3-BF4B-00C04F79EFBC}") = "AlgoPlatform.Compiler", "AlgoPlatform.Compiler\AlgoPlatform.Compiler.csproj", "{B3724CF1-5972-4260-8DCE-274EDF1FBF4D}"
 EndProject
 Project("{FAE04EC0-301F-11D3-BF4B-00C04F79EFBC}") = "AlgoPlatform.Tests.Integration", "AlgoPlatform.Tests.Integration\AlgoPlatform.Tests.Integration.csproj", "{BCD06987-693A-4F1F-8B6E-CAB31C602EC7}"
 EndProject
@@ -136,6 +136,18 @@ Global
 		{C21AA8AE-9E4E-4F80-8547-419FE9096E27}.Release|x64.Build.0 = Release|Any CPU
 		{C21AA8AE-9E4E-4F80-8547-419FE9096E27}.Release|x86.ActiveCfg = Release|Any CPU
 		{C21AA8AE-9E4E-4F80-8547-419FE9096E27}.Release|x86.Build.0 = Release|Any CPU
+		{B3724CF1-5972-4260-8DCE-274EDF1FBF4D}.Debug|Any CPU.ActiveCfg = Debug|Any CPU
+		{B3724CF1-5972-4260-8DCE-274EDF1FBF4D}.Debug|Any CPU.Build.0 = Debug|Any CPU
+		{B3724CF1-5972-4260-8DCE-274EDF1FBF4D}.Debug|x64.ActiveCfg = Debug|Any CPU
+		{B3724CF1-5972-4260-8DCE-274EDF1FBF4D}.Debug|x64.Build.0 = Debug|Any CPU
+		{B3724CF1-5972-4260-8DCE-274EDF1FBF4D}.Debug|x86.ActiveCfg = Debug|Any CPU
+		{B3724CF1-5972-4260-8DCE-274EDF1FBF4D}.Debug|x86.Build.0 = Debug|Any CPU
+		{B3724CF1-5972-4260-8DCE-274EDF1FBF4D}.Release|Any CPU.ActiveCfg = Release|Any CPU
+		{B3724CF1-5972-4260-8DCE-274EDF1FBF4D}.Release|Any CPU.Build.0 = Release|Any CPU
+		{B3724CF1-5972-4260-8DCE-274EDF1FBF4D}.Release|x64.ActiveCfg = Release|Any CPU
+		{B3724CF1-5972-4260-8DCE-274EDF1FBF4D}.Release|x64.Build.0 = Release|Any CPU
+		{B3724CF1-5972-4260-8DCE-274EDF1FBF4D}.Release|x86.ActiveCfg = Release|Any CPU
+		{B3724CF1-5972-4260-8DCE-274EDF1FBF4D}.Release|x86.Build.0 = Release|Any CPU
 		{BCD06987-693A-4F1F-8B6E-CAB31C602EC7}.Debug|Any CPU.ActiveCfg = Debug|Any CPU
 		{BCD06987-693A-4F1F-8B6E-CAB31C602EC7}.Debug|Any CPU.Build.0 = Debug|Any CPU
 		{BCD06987-693A-4F1F-8B6E-CAB31C602EC7}.Debug|x64.ActiveCfg = Debug|Any CPU
@@ -148,18 +160,6 @@ Global
 		{BCD06987-693A-4F1F-8B6E-CAB31C602EC7}.Release|x64.Build.0 = Release|Any CPU
 		{BCD06987-693A-4F1F-8B6E-CAB31C602EC7}.Release|x86.ActiveCfg = Release|Any CPU
 		{BCD06987-693A-4F1F-8B6E-CAB31C602EC7}.Release|x86.Build.0 = Release|Any CPU
-\t\t{B3724CF1-5972-4260-8DCE-274EDF1FBF4D}.Debug|Any CPU.ActiveCfg = Debug|Any CPU
-\t\t{B3724CF1-5972-4260-8DCE-274EDF1FBF4D}.Debug|Any CPU.Build.0 = Debug|Any CPU
-\t\t{B3724CF1-5972-4260-8DCE-274EDF1FBF4D}.Debug|x64.ActiveCfg = Debug|Any CPU
-\t\t{B3724CF1-5972-4260-8DCE-274EDF1FBF4D}.Debug|x64.Build.0 = Debug|Any CPU
-\t\t{B3724CF1-5972-4260-8DCE-274EDF1FBF4D}.Debug|x86.ActiveCfg = Debug|Any CPU
-\t\t{B3724CF1-5972-4260-8DCE-274EDF1FBF4D}.Debug|x86.Build.0 = Debug|Any CPU
-\t\t{B3724CF1-5972-4260-8DCE-274EDF1FBF4D}.Release|Any CPU.ActiveCfg = Release|Any CPU
-\t\t{B3724CF1-5972-4260-8DCE-274EDF1FBF4D}.Release|Any CPU.Build.0 = Release|Any CPU
-\t\t{B3724CF1-5972-4260-8DCE-274EDF1FBF4D}.Release|x64.ActiveCfg = Release|Any CPU
-\t\t{B3724CF1-5972-4260-8DCE-274EDF1FBF4D}.Release|x64.Build.0 = Release|Any CPU
-\t\t{B3724CF1-5972-4260-8DCE-274EDF1FBF4D}.Release|x86.ActiveCfg = Release|Any CPU
-\t\t{B3724CF1-5972-4260-8DCE-274EDF1FBF4D}.Release|x86.Build.0 = Release|Any CPU
 	EndGlobalSection
 	GlobalSection(SolutionProperties) = preSolution
 		HideSolutionNode = FALSE

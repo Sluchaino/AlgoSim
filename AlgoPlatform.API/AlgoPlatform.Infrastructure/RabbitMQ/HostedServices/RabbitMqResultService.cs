@@ -1,3 +1,4 @@
+using System;
 using System.Collections.Generic;
 using System.Text;
 using System.Text.Json;
@@ -90,6 +91,15 @@ namespace AlgoPlatform.Infrastructure.RabbitMQ.HostedServices
                 submission = await repo.GetAsync(result.SubmissionId, CancellationToken.None);
                 if (submission is null)
                 {
+                    await _channel.BasicAckAsync(ea.DeliveryTag, multiple: false);
+                    return;
+                }
+
+                if (string.Equals(submission.Status, "Cancelled", StringComparison.OrdinalIgnoreCase))
+                {
+                    await status.SetAsync(
+                        result.SubmissionId,
+                        new SubmissionStatus("Cancelled", 100, submission.Error ?? "Cancelled by user"));
                     await _channel.BasicAckAsync(ea.DeliveryTag, multiple: false);
                     return;
                 }

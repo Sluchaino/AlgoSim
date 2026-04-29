@@ -78,26 +78,78 @@
     updateQuickRange();
   }
 
-  function scheduleCompare(pivotIdx, idx) {
+  function resolvePointerMoveMs() {
+    if (Number.isFinite(window.__algoDelayMs) && window.__algoDelayMs > 0) {
+      return Math.max(50, Math.round(window.__algoDelayMs));
+    }
+    const moveDur = (window.VizDUR && Number.isFinite(VizDUR.move)) ? VizDUR.move : 0.35;
+    return Math.max(50, Math.round(moveDur * 1000));
+  }
+
+  function resolveComparePulseMs() {
+    if (window.VizHL && typeof VizHL.getPulseMs === 'function') {
+      const ms = VizHL.getPulseMs('compare');
+      if (Number.isFinite(ms) && ms > 0) return Math.max(50, Math.round(ms));
+    }
+    const pulseSec = (window.VizDUR && Number.isFinite(VizDUR.pulse)) ? VizDUR.pulse : 0.25;
+    return Math.max(50, Math.round(pulseSec * 1000));
+  }
+
+  function resolveQuickReadMs() {
+    // Start read immediately after pointer arrives, but keep duration from UI settings.
+    if (window.VizHL && typeof VizHL.getPulseMs === 'function') {
+      const ms = VizHL.getPulseMs('read');
+      if (Number.isFinite(ms) && ms > 0) return Math.max(30, Math.round(ms));
+    }
+    return 80;
+  }
+
+  function scheduleCompare(pivotIdx, idx, moveMs) {
     if (!window.VizHL) return;
     QuickSortState.compareToken += 1;
     const token = QuickSortState.compareToken;
-    const dur = (window.VizDUR && Number.isFinite(VizDUR.move)) ? VizDUR.move : 0.35;
-    const delayMs = Math.max(0, Math.round(dur * 1000));
-    const fire = () => {
+    const delayMs = Number.isFinite(moveMs) ? Math.max(0, Math.round(moveMs)) : resolvePointerMoveMs();
+    const readMs = resolveQuickReadMs();
+    const compareMs = resolveComparePulseMs();
+    const settleMs = Math.max(20, Math.min(100, Math.round(delayMs * 0.1)));
+    const hasPivot = Number.isInteger(pivotIdx) && pivotIdx >= 0;
+    const sameAsPivot = hasPivot && pivotIdx === idx;
+
+    const fireCompare = () => {
       if (QuickSortState.compareToken !== token) return;
-      if (Number.isInteger(pivotIdx) && pivotIdx >= 0) VizHL.pulseCompare(pivotIdx, idx);
-      else VizHL.pulseCompare(idx, idx);
+      if (hasPivot && !sameAsPivot) {
+        VizHL.pulseCompare(pivotIdx, idx);
+      }
     };
+
+    const fireReadThenCompare = () => {
+      if (QuickSortState.compareToken !== token) return;
+      VizHL.pulseRead(idx, readMs);
+      if (readMs <= 0) {
+        fireCompare();
+        return;
+      }
+      if (window.gsap) {
+        gsap.delayedCall(readMs / 1000, fireCompare);
+      } else {
+        setTimeout(fireCompare, readMs);
+      }
+    };
+
     if (delayMs <= 0) {
-      fire();
-      return;
+      fireReadThenCompare();
+      return readMs + compareMs + settleMs;
     }
+
     if (window.gsap) {
-      gsap.delayedCall(delayMs / 1000, fire);
+      gsap.delayedCall(delayMs / 1000, fireReadThenCompare);
     } else {
-      setTimeout(fire, delayMs);
+      setTimeout(fireReadThenCompare, delayMs);
     }
+
+    // Two-phase quick step timeline:
+    // 1) pointer move, 2) short read pulse, 3) compare pulse, then tiny settle.
+    return delayMs + readMs + compareMs + settleMs;
   }
 
   function handleQuickEvent(p) {
@@ -105,6 +157,28 @@
       ctx.setCurrentArray(p.value);
       resetQuickSortState();
       return;
+    }
+
+    if (p.kind === 'pivotAuto') {
+      // New pivot means a new partition pass; reset visible partition window.
+      QuickSortState.rangeL = null;
+      QuickSortState.rangeR = null;
+      if (window.VizRanges && VizRanges.remove) {
+        VizRanges.remove('partition');
+      }
+      if (p.value !== null && p.value !== undefined) {
+        QuickSortState.pivotValue = p.value;
+      }
+      if (Number.isInteger(p.index) && p.index >= 0) {
+        setQuickPivotIndex(p.index);
+        if (window.VizHL && typeof VizHL.pulseRead === 'function') {
+          VizHL.pulseRead(p.index);
+        }
+      } else {
+        updateQuickPivotFromValue();
+      }
+      const pulseMs = (window.VizDUR ? (VizDUR.pulse || 0.25) : 0.25) * 1000;
+      return Math.round(pulseMs);
     }
 
     if (p.kind === 'compareEx') {
@@ -127,22 +201,31 @@
         }
       }
       if (Number.isInteger(idx) && idx >= 0) {
+        const pointerMoveMs = resolvePointerMoveMs();
         if (p.op === '<' || p.op === '<=') {
           QuickSortState.i = idx;
           QuickSortState.lastCompareOp = p.op;
-          ctx.upsertPtr('i', idx, 'left');
+          ctx.upsertPtr('i', idx, 'left', { durationMs: pointerMoveMs });
         } else if (p.op === '>' || p.op === '>=') {
           QuickSortState.j = idx;
           QuickSortState.lastCompareOp = p.op;
-          ctx.upsertPtr('j', idx, 'right');
+          ctx.upsertPtr('j', idx, 'right', { durationMs: pointerMoveMs });
         } else {
           QuickSortState.lastCompareOp = p.op || null;
         }
         updateQuickRangeFromIndex(idx);
         updateQuickPivotFromValue();
         const pivotIdx = QuickSortState.pivotIndex;
-        scheduleCompare(pivotIdx, idx);
+        return scheduleCompare(pivotIdx, idx, pointerMoveMs);
       }
+      return;
+    }
+
+    if (p.kind === 'compare') {
+      // For auto quick-sort with const pivot one side is often synthetic (-1):
+      // keep compare visuals from compareEx to avoid duplicates.
+      if (p.i === -1 || p.j === -1) return;
+      ctx.handleGenericEvent(p);
       return;
     }
 
@@ -153,17 +236,21 @@
       return;
     }
 
-    if (p.kind === 'read' && window.VizHL && Number.isInteger(p.i)) {
-      QuickSortState.lastReadIndex = p.i;
-      QuickSortState.lastReadValue = ('value' in p) ? p.value : null;
-      VizHL.pulseRead(p.i);
-      return;
-    }
+  if (p.kind === 'read' && window.VizHL && Number.isInteger(p.i)) {
+    QuickSortState.lastReadIndex = p.i;
+    QuickSortState.lastReadValue = ('value' in p) ? p.value : null;
+    return;
+  }
 
     ctx.handleGenericEvent(p);
   }
 
   window.VizScene.registerAuto('quick', {
+    handle: handleQuickEvent,
+    reset: resetQuickSortState
+  });
+
+  window.VizScene.registerControlled('quick', {
     handle: handleQuickEvent,
     reset: resetQuickSortState
   });

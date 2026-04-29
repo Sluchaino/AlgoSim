@@ -9,8 +9,19 @@
     sorted: new Set()
   };
   
-  // РСЃРїРѕР»СЊР·СѓРµРј pulse РёР· VizDUR РёР· config.js
-  let pulseSec = window.VizDUR ? VizDUR.pulse : 0.25;
+  // Базовые длительности пульса по типам действий
+  const pulseMs = {
+    compare: Math.round(((window.VizDUR ? VizDUR.pulse : 0.25) || 0.25) * 1000),
+    swap: Math.round(((window.VizDUR ? VizDUR.pulse : 0.25) || 0.25) * 1000),
+    read: Math.round(((window.VizDUR ? VizDUR.pulse : 0.25) || 0.25) * 1000),
+    write: Math.round(((window.VizDUR ? VizDUR.pulse : 0.25) || 0.25) * 1000),
+    notFound: Math.round(((window.VizDUR ? VizDUR.pulse : 0.25) || 0.25) * 1600)
+  };
+
+  function pulseSecFor(kind) {
+    const ms = Number.isFinite(pulseMs[kind]) ? pulseMs[kind] : 250;
+    return Math.max(0.03, ms / 1000);
+  }
 
   function _apply() {
     const items = document.querySelectorAll('#stage .item');
@@ -49,18 +60,46 @@
     }
   }
 
-  function setPulseMs(ms) { 
-    pulseSec = Math.max(0.03, (ms|0) / 1000); 
+  function setPulseMs(ms) {
+    const val = Math.max(30, ms | 0);
+    pulseMs.compare = val;
+    pulseMs.swap = val;
+    pulseMs.read = val;
+    pulseMs.write = val;
+    pulseMs.notFound = Math.max(60, Math.round(val * 1.6));
+  }
+
+  function setPulseProfile(profile) {
+    if (!profile || typeof profile !== 'object') return;
+    const apply = (key, minMs = 30) => {
+      const raw = profile[key];
+      if (!Number.isFinite(raw)) return;
+      pulseMs[key] = Math.max(minMs, Math.round(raw));
+    };
+    apply('compare');
+    apply('swap');
+    apply('read');
+    apply('write');
+    apply('notFound', 60);
+  }
+
+  function getPulseMs(kind) {
+    const key = String(kind || '').trim();
+    if (!key) return null;
+    const val = pulseMs[key];
+    if (!Number.isFinite(val)) return null;
+    return Math.max(30, Math.round(val));
   }
 
   function pulseCompare(i, j) {
+    const sec = pulseSecFor('compare');
     sets.compare.clear();
     if (Number.isInteger(i)) sets.compare.add(i);
     if (Number.isInteger(j)) sets.compare.add(j);
     _apply();
     
     if (window.gsap) {
-      gsap.delayedCall(pulseSec, () => { 
+      gsap.delayedCall(sec, () => {
         sets.compare.clear(); 
         _apply(); 
       });
@@ -68,18 +107,19 @@
       setTimeout(() => {
         sets.compare.clear();
         _apply();
-      }, pulseSec * 1000);
+      }, sec * 1000);
     }
   }
 
   function pulseSwap(i, j) {
+    const sec = pulseSecFor('swap');
     sets.swap.clear();
     if (Number.isInteger(i)) sets.swap.add(i);
     if (Number.isInteger(j)) sets.swap.add(j);
     _apply();
     
     if (window.gsap) {
-      gsap.delayedCall(pulseSec, () => { 
+      gsap.delayedCall(sec, () => {
         sets.swap.clear(); 
         _apply(); 
       });
@@ -87,19 +127,23 @@
       setTimeout(() => {
         sets.swap.clear();
         _apply();
-      }, pulseSec * 1000);
+      }, sec * 1000);
     }
   }
 
-  function pulseRead(i) {
+  function pulseRead(i, durationMs) {
+    const sec = Number.isFinite(durationMs)
+      ? Math.max(0.03, Number(durationMs) / 1000)
+      : pulseSecFor('read');
     if (!Number.isInteger(i)) return;
     
     sets.read.clear();
     sets.read.add(i);
     _apply();
+    animateReadPulse(i, sec);
     
     if (window.gsap) {
-      gsap.delayedCall(pulseSec, () => { 
+      gsap.delayedCall(sec, () => {
         sets.read.clear(); 
         _apply(); 
       });
@@ -107,11 +151,74 @@
       setTimeout(() => {
         sets.read.clear();
         _apply();
-      }, pulseSec * 1000);
+      }, sec * 1000);
     }
   }
 
+  function animateReadPulse(i, sec) {
+    const node = (window.VizState && typeof VizState.nodeAtIndex === 'function')
+      ? VizState.nodeAtIndex(i)
+      : null;
+    if (!node) return;
+    const circle = node.querySelector('circle');
+    if (!circle) return;
+
+    const ns = (node.ownerSVGElement && node.ownerSVGElement.namespaceURI)
+      ? node.ownerSVGElement.namespaceURI
+      : 'http://www.w3.org/2000/svg';
+    const baseR = Number(circle.getAttribute('r'));
+    const startR = Number.isFinite(baseR) ? Math.max(4, baseR * 0.72) : 10;
+    const endR = Number.isFinite(baseR) ? (baseR + 8) : 18;
+
+    const prevRipple = node.querySelector('circle.read-ripple');
+    if (prevRipple) prevRipple.remove();
+
+    const ripple = document.createElementNS(ns, 'circle');
+    ripple.setAttribute('class', 'read-ripple');
+    ripple.setAttribute('cx', '0');
+    ripple.setAttribute('cy', '0');
+    ripple.setAttribute('r', String(startR));
+    ripple.setAttribute('fill', 'none');
+    ripple.setAttribute('stroke', '#38bdf8');
+    ripple.setAttribute('stroke-width', '2.2');
+    ripple.setAttribute('opacity', '0.85');
+    ripple.setAttribute('pointer-events', 'none');
+    node.appendChild(ripple);
+
+    const done = () => { if (ripple.parentNode) ripple.remove(); };
+    if (window.gsap) {
+      gsap.to(ripple, {
+        attr: { r: endR },
+        opacity: 0,
+        duration: Math.max(0.06, sec),
+        ease: 'none',
+        overwrite: 'auto',
+        onComplete: done
+      });
+      return;
+    }
+
+    if (typeof ripple.animate === 'function') {
+      const anim = ripple.animate(
+        [
+          { opacity: 0.85, r: startR },
+          { opacity: 0.00, r: endR }
+        ],
+        {
+          duration: Math.max(60, Math.round(sec * 1000)),
+          easing: 'linear',
+          fill: 'forwards'
+        }
+      );
+      anim.onfinish = done;
+      return;
+    }
+
+    setTimeout(done, Math.max(60, Math.round(sec * 1000)));
+  }
+
   function pulseWrite(i) {
+    const sec = pulseSecFor('write');
     if (!Number.isInteger(i)) return;
 
     sets.write.clear();
@@ -119,7 +226,7 @@
     _apply();
 
     if (window.gsap) {
-      gsap.delayedCall(pulseSec, () => { 
+      gsap.delayedCall(sec, () => {
         sets.write.clear(); 
         _apply(); 
       });
@@ -127,18 +234,19 @@
       setTimeout(() => {
         sets.write.clear();
         _apply();
-      }, pulseSec * 1000);
+      }, sec * 1000);
     }
   }
 
   function pulseNotFound() {
+    const sec = Math.max(0.06, (pulseMs.notFound || 400) / 1000);
     const items = document.querySelectorAll('#stage .item');
     items.forEach(n => n.classList.add('notfound'));
     const clear = () => items.forEach(n => n.classList.remove('notfound'));
     if (window.gsap) {
-      gsap.delayedCall(pulseSec * 1.6, clear);
+      gsap.delayedCall(sec, clear);
     } else {
-      setTimeout(clear, pulseSec * 1600);
+      setTimeout(clear, sec * 1000);
     }
   }
 
@@ -190,7 +298,9 @@
   // Р­РєСЃРїРѕСЂС‚
   window.VizHL = { 
     sets, 
-    setPulseMs, 
+    setPulseMs,
+    setPulseProfile,
+    getPulseMs,
     pulseCompare, 
     pulseSwap, 
     pulseRead,

@@ -6,6 +6,7 @@
   let renderChips = null;
   let playbackHook = null;
   let baseDelayMs = 0;
+  let seekMode = false;
   const DUR_BASE = window.__VizDUR_BASE || (window.VizDUR ? { ...VizDUR } : {
     pulse: 0.25,
     move: 0.35,
@@ -67,7 +68,7 @@
     return { x, y };
   }
 
-  function upsertPtr(name, index, tag) {
+  function upsertPtr(name, index, tag, options) {
     const key = String(name || 'ptr');
     const layer = ptrLayer();
     if (!layer) return;
@@ -99,13 +100,28 @@
     entry.index = index;
     entry.tag = tag;
 
+    const safeName = sanitizeTag(key);
     const safeTag = sanitizeTag(tag);
-    entry.g.className.baseVal = 'ptr' + (safeTag ? ' ptr-' + safeTag : '');
+    const classes = ['ptr'];
+    if (safeName) classes.push('ptr-name-' + safeName);
+    if (safeTag) classes.push('ptr-' + safeTag);
+    entry.g.className.baseVal = classes.join(' ');
 
     const pos = ptrPosition(index);
     if (!pos) return;
 
-    if (window.gsap) gsap.to(entry.g, { x: pos.x, y: pos.y, duration: VizDUR.move });
+    if (window.gsap) {
+      const opts = options && typeof options === 'object' ? options : null;
+      const explicitMs = opts && Number.isFinite(opts.durationMs) ? Math.max(0, Math.round(opts.durationMs)) : null;
+      const fallbackMs = getPointerDurationMs(key);
+      const moveMs = explicitMs !== null ? explicitMs : fallbackMs;
+      const moveDur = moveMs / 1000;
+      if (seekMode || moveDur <= 0) {
+        gsap.set(entry.g, { x: pos.x, y: pos.y });
+      } else {
+        gsap.to(entry.g, { x: pos.x, y: pos.y, duration: moveDur, ease: 'none', overwrite: 'auto' });
+      }
+    }
     else entry.g.style.transform = `translate(${pos.x}px, ${pos.y}px)`;
   }
 
@@ -122,11 +138,18 @@
     PtrState.map.clear();
   }
 
-  function refreshPtrs() {
+  function refreshPtrs(durationSec = 0) {
+    const dur = Number.isFinite(durationSec) ? Math.max(0, durationSec) : 0;
     PtrState.map.forEach(entry => {
       const pos = ptrPosition(entry.index);
       if (!pos) return;
-      if (window.gsap) gsap.set(entry.g, { x: pos.x, y: pos.y });
+      if (window.gsap) {
+        if (dur > 0 && !seekMode) {
+          gsap.to(entry.g, { x: pos.x, y: pos.y, duration: dur, ease: 'none', overwrite: 'auto' });
+        } else {
+          gsap.set(entry.g, { x: pos.x, y: pos.y });
+        }
+      }
       else entry.g.style.transform = `translate(${pos.x}px, ${pos.y}px)`;
     });
   }
@@ -206,18 +229,32 @@
     baseDelayMs = Math.max(0, n);
   }
 
-  function getSwapDurationMs() {
-    let base = Number.isFinite(baseDelayMs) && baseDelayMs > 0 ? baseDelayMs : 0;
-    if (!base) {
-      const baseSec = (window.VizDUR && (VizDUR.swap || VizDUR.move)) ? (VizDUR.swap || VizDUR.move) : 0.35;
-      base = Math.round(baseSec * 1000);
+  function getPointerDurationMs(name) {
+    if (Number.isFinite(window.__algoDelayMs) && window.__algoDelayMs > 0) {
+      return Math.round(Math.min(12000, Math.max(50, window.__algoDelayMs)));
     }
-    const target = base * 6;
-    return Math.round(Math.min(8000, Math.max(400, target)));
+    const moveMs = (window.VizDUR && Number.isFinite(VizDUR.move))
+      ? Math.round(VizDUR.move * 1000)
+      : 350;
+    return Math.max(50, moveMs);
+  }
+
+  function getSwapDurationMs() {
+    if (seekMode) return 0;
+    if (Number.isFinite(baseDelayMs) && baseDelayMs > 0) {
+      return Math.round(Math.min(12000, Math.max(50, baseDelayMs)));
+    }
+    const baseSec = (window.VizDUR && (VizDUR.swap || VizDUR.move)) ? (VizDUR.swap || VizDUR.move) : 0.35;
+    const base = Math.round(baseSec * 1000);
+    return Math.round(Math.min(12000, Math.max(50, base)));
   }
 
   function setPlaybackState(playing) {
     if (typeof playbackHook === 'function') playbackHook(playing);
+  }
+
+  function setSeekMode(enabled) {
+    seekMode = !!enabled;
   }
 
   function clearMarks(tag) {
@@ -297,8 +334,12 @@
         if (window.VizRanges) VizRanges.clearAll();
         break;
       case 'ptr':
-        upsertPtr(p.name || 'ptr', p.index, p.tag);
-        break;
+        {
+          const ptrName = p.name || 'ptr';
+          const ptrMs = getPointerDurationMs(ptrName);
+          upsertPtr(ptrName, p.index, p.tag, { durationMs: ptrMs });
+          break;
+        }
       case 'ptrClear':
         clearPtr(p.name || 'ptr');
         break;
@@ -362,6 +403,21 @@
       nodeB.classList.remove('swap');
     };
 
+    if (seekMode) {
+      S.order.forEach(it => {
+        const node = S.nodesById.get(it.id);
+        const targetX = afterById.get(it.id);
+        if (!node || !Number.isFinite(targetX)) return;
+        if (window.gsap) gsap.set(node, { x: targetX, y: VizCFG.CY });
+        else node.style.transform = `translate(${targetX}px, ${VizCFG.CY}px)`;
+      });
+      if (window.VizScene) VizScene._lastSwapDurationMs = 0;
+      clearSwapClass();
+      if (window.VizRanges) VizRanges.recompute();
+      refreshPtrs(0);
+      return;
+    }
+
     if (window.gsap) {
       if (window.VizScene) VizScene._lastSwapDurationMs = Math.round(swapMs);
       S.order.forEach(it => {
@@ -403,7 +459,7 @@
     }
 
     if (window.VizRanges) VizRanges.recompute();
-    refreshPtrs();
+    refreshPtrs(total);
   }
 
   function handleStepEvent(evt) {
@@ -416,20 +472,17 @@
     if (mode === 'controlled') {
       const handler = controlledHandlers[algo];
       if (handler && typeof handler.handle === 'function') {
-        handler.handle(p, ctx);
-        return;
+        return handler.handle(p, ctx);
       }
-      handleGenericEvent(p);
-      return;
+      return handleGenericEvent(p);
     }
 
     const handler = autoHandlers[algo];
     if (handler && typeof handler.handle === 'function') {
-      handler.handle(p, ctx);
-      return;
+      return handler.handle(p, ctx);
     }
 
-    handleGenericEvent(p);
+    return handleGenericEvent(p);
   }
 
   function handleStepLine(line) {
@@ -481,6 +534,7 @@
     setBaseDelay,
     setAnimationSpeed,
     setPlaybackState,
+    setSeekMode,
     getSwapDelayMs: () => {
       const last = window.VizScene ? window.VizScene._lastSwapDurationMs : 0;
       if (Number.isFinite(last) && last > 0) return last;

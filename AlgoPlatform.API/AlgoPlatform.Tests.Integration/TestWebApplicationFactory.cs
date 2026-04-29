@@ -37,6 +37,7 @@ namespace AlgoPlatform.Tests.Integration
                 RemoveService<IChannel>(services);
                 RemoveService<ISubmissionStatusStore>(services);
                 RemoveService<ISubmissionQueuePublisher>(services);
+                RemoveService<IRunCancelQueuePublisher>(services);
 
                 var inMemoryProvider = new ServiceCollection()
                     .AddEntityFrameworkInMemoryDatabase()
@@ -54,6 +55,7 @@ namespace AlgoPlatform.Tests.Integration
 
                 services.AddSingleton<ISubmissionStatusStore, InMemorySubmissionStatusStore>();
                 services.AddSingleton<ISubmissionQueuePublisher, NoOpSubmissionQueuePublisher>();
+                services.AddSingleton<IRunCancelQueuePublisher, NoOpRunCancelQueuePublisher>();
 
                 using var scope = services.BuildServiceProvider().CreateScope();
                 var db = scope.ServiceProvider.GetRequiredService<AlgoPlatformDbContext>();

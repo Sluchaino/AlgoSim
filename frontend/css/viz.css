@@ -6,10 +6,77 @@
   margin-top: 14px;
   overflow: hidden;
   background: #fafafa;
+  position: relative;
 }
 
-#stage { width: 100%; height: 280px; }
+.graph-canvas {
+  position: relative;
+}
+
+#stage { width: 100%; height: 320px; }
 svg { max-width: 100%; height: auto; display: block; }
+
+.viz-steps-corner {
+  position: absolute;
+  bottom: 10px;
+  right: 10px;
+  width: min(360px, calc(100% - 20px));
+  max-height: calc(100% - 20px);
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+  padding: 0;
+  border: none;
+  border-radius: 0;
+  background: transparent;
+  color: #0f172a;
+  backdrop-filter: none;
+  z-index: 5;
+  pointer-events: none;
+  text-align: right;
+}
+
+.viz-steps-corner-head {
+  display: flex;
+  align-items: center;
+  justify-content: flex-end;
+  gap: 8px;
+}
+
+.viz-steps-corner-title {
+  font-size: 12px;
+  font-weight: 700;
+}
+
+.viz-steps-corner-meta {
+  font-size: 11px;
+  color: #334155;
+  font-variant-numeric: tabular-nums;
+}
+
+.viz-steps-corner-list {
+  display: grid;
+  gap: 2px;
+  max-height: 132px;
+  overflow: hidden;
+  font-size: 11px;
+  line-height: 1.25;
+  color: #1e293b;
+}
+
+.viz-steps-corner-item {
+  display: block;
+  padding: 0;
+  border-radius: 0;
+  background: transparent;
+}
+
+.viz-steps-corner-item.is-active {
+  background: transparent;
+  border: none;
+  color: #1d4ed8;
+  font-weight: 700;
+}
 
 /* Р‘Р°Р·РѕРІС‹Рµ СЃС‚РёР»Рё РґР»СЏ СѓР·Р»РѕРІ */
 #stage .item { will-change: transform; }
@@ -62,10 +129,40 @@ svg { max-width: 100%; height: auto; display: block; }
 #stage .item.swap circle {
   stroke: #ff6e6e;
   stroke-width: 3px;
+  fill: #ff9a9a !important;
+  filter: drop-shadow(0 0 8px rgba(255, 110, 110, 0.55));
 }
 #stage .item.write circle {
   stroke: #16a34a;
   stroke-width: 3px;
+}
+
+/* Указатели */
+#stage .pointers .ptr {
+  pointer-events: none;
+  will-change: transform;
+}
+
+#stage .ptr .ptr-triangle {
+  fill: #64748b;
+  stroke: #475569;
+  stroke-width: 1.5px;
+}
+
+#stage .ptr.ptr-name-i .ptr-triangle {
+  fill: #2563eb;
+  stroke: #1d4ed8;
+}
+
+#stage .ptr.ptr-name-j .ptr-triangle {
+  fill: #ef4444;
+  stroke: #dc2626;
+}
+
+#stage .ptr .ptr-label {
+  fill: #6b7280;
+  font-size: 12px;
+  font-weight: 700;
 }
 
 /* Р”РёР°РїР°Р·РѕРЅС‹ */
@@ -78,10 +175,10 @@ svg { max-width: 100%; height: auto; display: block; }
 }
 
 @media (max-width: 720px) {
-  #stage { height: 220px; }
+  #stage { height: 250px; }
 }
 
 @media (max-width: 480px) {
-  #stage { height: 200px; }
+  #stage { height: 220px; }
 }
 

@@ -1,3 +1,4 @@
+using System.Collections.Concurrent;
 using System.Collections.Generic;
 using System.Text;
 using System.Text.Json;
@@ -15,17 +16,21 @@ namespace AlgoPlatform.Runner.RabbitMQ
     public sealed class RabbitMqRunWorker : BackgroundService
     {
         private readonly IChannel _channel;
+        private readonly IChannel _cancelChannel;
         private readonly IChannel _heartbeatChannel;
         private readonly DockerCliCodeRunner _runner;
         private readonly S3ArtifactStorage _storage;
         private readonly string _runQueue;
         private readonly string _runRetryQueue;
         private readonly string _runDeadQueue;
+        private readonly string _cancelQueue;
         private readonly string _resultQueue;
         private readonly string _heartbeatQueue;
         private readonly TimeSpan _heartbeatInterval;
         private readonly int _maxRetries;
         private readonly ILogger<RabbitMqRunWorker> _logger;
+        private readonly ConcurrentDictionary<Guid, CancellationTokenSource> _activeRuns = new();
+        private readonly ConcurrentDictionary<Guid, byte> _cancelRequested = new();
 
         public RabbitMqRunWorker(
             IConnection connection,
@@ -36,6 +41,7 @@ namespace AlgoPlatform.Runner.RabbitMQ
             ILogger<RabbitMqRunWorker> logger)
         {
             _channel = connection.CreateChannelAsync().GetAwaiter().GetResult();
+            _cancelChannel = connection.CreateChannelAsync().GetAwaiter().GetResult();
             _heartbeatChannel = connection.CreateChannelAsync().GetAwaiter().GetResult();
             _runner = runner;
             _storage = storage;
@@ -43,6 +49,7 @@ namespace AlgoPlatform.Runner.RabbitMQ
             _runQueue = configuration["RabbitMQ:RunQueue"] ?? "runs";
             _runRetryQueue = _runQueue + ".retry";
             _runDeadQueue = _runQueue + ".dead";
+            _cancelQueue = configuration["RabbitMQ:CancelQueue"] ?? "run-cancel";
             _resultQueue = configuration["RabbitMQ:ResultQueue"] ?? "run-results";
             _heartbeatQueue = configuration["RabbitMQ:HeartbeatQueue"] ?? "run-heartbeats";
             _maxRetries = configuration.GetValue<int?>("RabbitMQ:MaxRetries") ?? 3;
@@ -59,11 +66,14 @@ namespace AlgoPlatform.Runner.RabbitMQ
                 autoDelete: false,
                 arguments: null
             ).GetAwaiter().GetResult();
+
+            DeclareQueueWithRetry(_cancelChannel, _cancelQueue, retryDelaySeconds);
         }
 
         protected override async Task ExecuteAsync(CancellationToken stoppingToken)
         {
             await _channel.BasicQosAsync(0, 1, false, stoppingToken);
+            await _cancelChannel.BasicQosAsync(0, 10, false, stoppingToken);
 
             var consumer = new AsyncEventingBasicConsumer(_channel);
             consumer.ReceivedAsync += OnReceivedAsync;
@@ -72,6 +82,15 @@ namespace AlgoPlatform.Runner.RabbitMQ
                 queue: _runQueue,
                 autoAck: false,
                 consumer: consumer,
+                cancellationToken: stoppingToken);
+
+            var cancelConsumer = new AsyncEventingBasicConsumer(_cancelChannel);
+            cancelConsumer.ReceivedAsync += OnCancelReceivedAsync;
+
+            await _cancelChannel.BasicConsumeAsync(
+                queue: _cancelQueue,
+                autoAck: false,
+                consumer: cancelConsumer,
                 cancellationToken: stoppingToken);
 
             _logger.LogInformation("RabbitMqRunWorker started, queue = {Queue}", _runQueue);
@@ -100,8 +119,21 @@ namespace AlgoPlatform.Runner.RabbitMQ
                     return;
                 }
 
+                if (_cancelRequested.TryRemove(job.SubmissionId, out _))
+                {
+                    await PublishCancelledResultAsync(job.SubmissionId, "Cancelled by user");
+                    await _channel.BasicAckAsync(ea.DeliveryTag, multiple: false);
+                    return;
+                }
+
                 using var heartbeatCts = new CancellationTokenSource();
                 var heartbeatTask = StartHeartbeatAsync(job.SubmissionId, heartbeatCts.Token);
+                using var runCts = new CancellationTokenSource();
+                _activeRuns[job.SubmissionId] = runCts;
+                if (_cancelRequested.TryRemove(job.SubmissionId, out _))
+                {
+                    runCts.Cancel();
+                }
 
                 try
                 {
@@ -119,12 +151,12 @@ namespace AlgoPlatform.Runner.RabbitMQ
                         var bytes = ms.ToArray();
 
                         (exitCode, stdout, stderr, durationMs, timedOut) =
-                            await _runner.RunPrecompiledAsync(bytes, job.Input, null, null, CancellationToken.None);
+                            await _runner.RunPrecompiledAsync(bytes, job.Input, null, null, runCts.Token);
                     }
                     else if (!string.IsNullOrWhiteSpace(job.Code))
                     {
                         (exitCode, stdout, stderr, durationMs, timedOut) =
-                            await _runner.RunAsync(job.Code, job.Input, null, null, CancellationToken.None);
+                            await _runner.RunAsync(job.Code, job.Input, null, null, runCts.Token);
                     }
                     else
                     {
@@ -151,8 +183,15 @@ namespace AlgoPlatform.Runner.RabbitMQ
 
                     await _channel.BasicAckAsync(ea.DeliveryTag, multiple: false);
                 }
+                catch (OperationCanceledException) when (runCts.IsCancellationRequested)
+                {
+                    await PublishCancelledResultAsync(job.SubmissionId, "Cancelled by user");
+                    await _channel.BasicAckAsync(ea.DeliveryTag, multiple: false);
+                }
                 finally
                 {
+                    _activeRuns.TryRemove(job.SubmissionId, out _);
+                    _cancelRequested.TryRemove(job.SubmissionId, out _);
                     heartbeatCts.Cancel();
                     await heartbeatTask;
                 }
@@ -215,6 +254,31 @@ namespace AlgoPlatform.Runner.RabbitMQ
             }
         }
 
+        private async Task OnCancelReceivedAsync(object sender, BasicDeliverEventArgs ea)
+        {
+            var text = Encoding.UTF8.GetString(ea.Body.ToArray());
+            if (!Guid.TryParse(text, out var submissionId))
+            {
+                _logger.LogWarning("Received invalid cancel message (not GUID): {Message}", text);
+                await _cancelChannel.BasicAckAsync(ea.DeliveryTag, multiple: false);
+                return;
+            }
+
+            _cancelRequested[submissionId] = 1;
+
+            if (_activeRuns.TryGetValue(submissionId, out var cts))
+            {
+                _logger.LogInformation("Cancelling running submission {SubmissionId}", submissionId);
+                cts.Cancel();
+            }
+            else
+            {
+                _logger.LogInformation("Cancellation marked for submission {SubmissionId}", submissionId);
+            }
+
+            await _cancelChannel.BasicAckAsync(ea.DeliveryTag, multiple: false);
+        }
+
         private async Task StartHeartbeatAsync(Guid submissionId, CancellationToken ct)
         {
             try
@@ -251,6 +315,27 @@ namespace AlgoPlatform.Runner.RabbitMQ
             await _heartbeatChannel.BasicPublishAsync(
                 exchange: "",
                 routingKey: _heartbeatQueue,
+                mandatory: false,
+                basicProperties: props,
+                body: body);
+        }
+
+        private async Task PublishCancelledResultAsync(Guid submissionId, string message)
+        {
+            var result = new RunResultMessage(
+                submissionId,
+                -1,
+                string.Empty,
+                string.IsNullOrWhiteSpace(message) ? "Cancelled" : message,
+                0,
+                false);
+
+            var body = JsonSerializer.SerializeToUtf8Bytes(result);
+            var props = new BasicProperties { Persistent = true };
+
+            await _channel.BasicPublishAsync(
+                exchange: "",
+                routingKey: _resultQueue,
                 mandatory: false,
                 basicProperties: props,
                 body: body);

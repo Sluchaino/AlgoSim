@@ -351,6 +351,7 @@ class Program
 
     int pivotIndex = (left + right) / 2;
     int pivot = a[pivotIndex];
+    t.Step(new { kind = "pivotChosen", index = pivotIndex, value = pivot, left, right });
     TracingExtensions.MarkPivot(t, pivotIndex);
 
     int i = left;
@@ -395,6 +396,7 @@ class Program
 
           if (i == pivotIndex) pivotIndex = j;
           else if (j == pivotIndex) pivotIndex = i;
+          t.Step(new { kind = "pivotChosen", index = pivotIndex, value = pivot, left, right });
           TracingExtensions.MarkPivot(t, pivotIndex);
         }
 
