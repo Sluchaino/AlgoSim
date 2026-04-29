@@ -1,19 +1,18 @@
-﻿// insertion.js - auto animation for insertion sort with lifted key and shifts
+﻿// insertion.js - insertion sort auto animation with shift-overwrite semantics
 (function () {
   if (!window.VizScene || !window.VizSceneCtx) return;
   const ctx = window.VizSceneCtx;
 
-  const KEY_LIFT_Y = 46;
   const recentReads = [];
+  let keyBadgeEl = null;
 
-  const InsertionState = {
+  const State = {
     active: false,
-    keyId: null,
     keyValue: null,
-    keyIndex: -1,
     keyOriginIndex: -1,
     compareIndex: -1,
     sortedEnd: 0,
+    awaitingInsert: false,
     isPlaying: false
   };
 
@@ -21,8 +20,41 @@
     return Math.round(((window.VizDUR && VizDUR.move) ? VizDUR.move : 0.35) * 1000);
   }
 
+  function writeMs() {
+    return Math.round(((window.VizDUR && VizDUR.set) ? VizDUR.set : 0.25) * 1000);
+  }
+
   function pulseMs() {
     return Math.round(((window.VizDUR && VizDUR.pulse) ? VizDUR.pulse : 0.25) * 1000);
+  }
+
+  function ensureKeyBadge() {
+    if (keyBadgeEl && keyBadgeEl.isConnected) return keyBadgeEl;
+    const host = document.querySelector('#array-panel .svg-box');
+    if (!host) return null;
+    let el = host.querySelector('[data-insertion-key-badge]');
+    if (!el) {
+      el = document.createElement('div');
+      el.className = 'insertion-key-badge';
+      el.setAttribute('data-insertion-key-badge', '1');
+      host.appendChild(el);
+    }
+    keyBadgeEl = el;
+    return keyBadgeEl;
+  }
+
+  function showKeyBadge(value) {
+    const el = ensureKeyBadge();
+    if (!el) return;
+    const v = Number.isFinite(value) ? Math.trunc(value) : null;
+    el.textContent = v === null ? 'Ключ' : `Ключ: ${v}`;
+    el.classList.add('is-visible');
+  }
+
+  function hideKeyBadge() {
+    const el = ensureKeyBadge();
+    if (!el) return;
+    el.classList.remove('is-visible');
   }
 
   function clearNodeClasses() {
@@ -30,7 +62,7 @@
     VizState._S.order.forEach((_, index) => {
       const node = VizState.nodeAtIndex(index);
       if (!node) return;
-      node.classList.remove('key', 'compare', 'sorted');
+      node.classList.remove('compare', 'sorted', 'key');
     });
   }
 
@@ -40,121 +72,83 @@
       const node = VizState.nodeAtIndex(index);
       if (!node) return;
       node.classList.remove('sorted');
-      if (index <= endIndex && (!InsertionState.active || index !== InsertionState.keyIndex)) {
-        node.classList.add('sorted');
-      }
+      if (index <= endIndex) node.classList.add('sorted');
     });
   }
 
-  function findIndexById(id) {
-    if (!id || !window.VizState || !VizState._S || !Array.isArray(VizState._S.order)) return -1;
-    for (let i = 0; i < VizState._S.order.length; i++) {
-      if (VizState._S.order[i].id === id) return i;
+  function setNodeValue(index, value) {
+    if (!Number.isInteger(index) || !window.VizState) return;
+    VizState.updateValueAt(index, value);
+    if (Array.isArray(window.currentArray) && index >= 0 && index < window.currentArray.length) {
+      window.currentArray[index] = value;
     }
-    return -1;
   }
 
-  function layoutWithLift(durationMs) {
-    if (!window.VizState || !VizState._S || !Array.isArray(VizState._S.order)) return;
-    const S = VizState._S;
-    const xs = VizState.centersX(S.order);
-    const durationSec = Math.max(0, Number(durationMs || 0) / 1000);
+  function getNodeCenter(index) {
+    if (!window.VizState || !VizState._S || !Array.isArray(VizState._S.order)) return null;
+    if (!Number.isInteger(index) || index < 0 || index >= VizState._S.order.length) return null;
+    const xs = VizState.centersX(VizState._S.order);
+    if (!Array.isArray(xs) || !Number.isFinite(xs[index])) return null;
+    return { x: xs[index], y: VizCFG.CY };
+  }
 
-    S.order.forEach((item, index) => {
-      const node = S.nodesById.get(item.id);
-      if (!node) return;
-      const isKeyNode = InsertionState.active && item.id === InsertionState.keyId;
-      const y = isKeyNode ? (VizCFG.CY - KEY_LIFT_Y) : VizCFG.CY;
-      const x = xs[index];
+  function animateShiftCopy(from, to, value) {
+    const fromPos = getNodeCenter(from);
+    const toPos = getNodeCenter(to);
+    if (!fromPos || !toPos || !window.VizState || !VizState._S) return;
 
-      if (window.gsap) {
-        if (durationSec > 0) {
-          gsap.to(node, { x, y, duration: durationSec, ease: 'none', overwrite: 'auto' });
-        } else {
-          gsap.set(node, { x, y });
-        }
+    const srcNode = VizState.nodeAtIndex(from);
+    const srcCircle = srcNode ? srcNode.querySelector('circle') : null;
+    const r = srcCircle ? Number(srcCircle.getAttribute('r')) : NaN;
+    const radius = Number.isFinite(r) ? r : (window.VizCFG ? VizCFG.R_MIN : 12);
+
+    const NS = window.VizCFG ? VizCFG.NS : 'http://www.w3.org/2000/svg';
+    const ghost = document.createElementNS(NS, 'g');
+    ghost.setAttribute('class', 'item shift-ghost');
+
+    const c = document.createElementNS(NS, 'circle');
+    c.setAttribute('r', String(radius));
+    const t = document.createElementNS(NS, 'text');
+    t.setAttribute('x', '0');
+    t.setAttribute('y', '0');
+    t.textContent = String(Number.isFinite(value) ? Math.trunc(value) : '');
+
+    ghost.appendChild(c);
+    ghost.appendChild(t);
+
+    const layer = document.querySelector('#stage g.items') || (VizState._S.svg || document.getElementById('stage'));
+    if (!layer) return;
+    layer.appendChild(ghost);
+
+    const sec = Math.max(0, moveMs() / 1000);
+    const removeGhost = () => {
+      if (ghost && ghost.parentNode) ghost.parentNode.removeChild(ghost);
+    };
+
+    if (window.gsap) {
+      gsap.set(ghost, { x: fromPos.x, y: fromPos.y });
+      if (sec > 0) {
+        gsap.to(ghost, { x: toPos.x, y: toPos.y, duration: sec, ease: 'none', overwrite: 'auto', onComplete: removeGhost });
       } else {
-        node.style.transform = `translate(${x}px, ${y}px)`;
+        gsap.set(ghost, { x: toPos.x, y: toPos.y });
+        removeGhost();
       }
-    });
-
-    if (window.VizRanges) VizRanges.recompute();
-    ctx.refreshPtrs(durationSec);
-  }
-
-  function beginKey(compareIndex, keyValue) {
-    if (!window.VizState || !VizState._S || !Array.isArray(VizState._S.order)) return;
-    if (!Number.isInteger(compareIndex)) return;
-
-    let keyIndex = -1;
-    for (let i = recentReads.length - 1; i >= 0; i--) {
-      const rr = recentReads[i];
-      if (!Number.isInteger(rr.index)) continue;
-      if (rr.index <= compareIndex) continue;
-      if (rr.value !== keyValue) continue;
-      keyIndex = rr.index;
-      break;
-    }
-    if (!Number.isInteger(keyIndex) || keyIndex < 0) {
-      keyIndex = compareIndex + 1;
-    }
-    if (keyIndex < 0 || keyIndex >= VizState._S.order.length) return;
-
-    const keyNode = VizState.nodeAtIndex(keyIndex);
-    if (!keyNode) return;
-    const item = VizState._S.order[keyIndex];
-    if (!item) return;
-
-    InsertionState.active = true;
-    InsertionState.keyId = item.id;
-    InsertionState.keyValue = keyValue;
-    InsertionState.keyIndex = keyIndex;
-    InsertionState.keyOriginIndex = keyIndex;
-    InsertionState.compareIndex = compareIndex;
-
-    keyNode.classList.add('key');
-    layoutWithLift(moveMs());
-  }
-
-  function finishKeyInsertion() {
-    if (!InsertionState.active) return;
-
-    const keyId = InsertionState.keyId;
-    if (keyId && window.VizState && VizState._S && VizState._S.nodesById) {
-      const keyNode = VizState._S.nodesById.get(keyId);
-      if (keyNode) keyNode.classList.remove('key');
+      return;
     }
 
-    InsertionState.active = false;
-    InsertionState.compareIndex = -1;
-    InsertionState.keyId = null;
-    InsertionState.keyValue = null;
-    InsertionState.keyIndex = -1;
-    InsertionState.sortedEnd = Math.max(InsertionState.sortedEnd, InsertionState.keyOriginIndex);
-    InsertionState.keyOriginIndex = -1;
-
-    layoutWithLift(moveMs());
-    setSortedPrefix(InsertionState.sortedEnd);
-    _renderChips();
+    ghost.style.transform = `translate(${fromPos.x}px, ${fromPos.y}px)`;
+    if (sec <= 0) {
+      ghost.style.transform = `translate(${toPos.x}px, ${toPos.y}px)`;
+      removeGhost();
+      return;
+    }
+    setTimeout(() => {
+      ghost.style.transform = `translate(${toPos.x}px, ${toPos.y}px)`;
+      setTimeout(removeGhost, Math.round(sec * 1000));
+    }, 0);
   }
 
-  function resetInsertionSortState() {
-    InsertionState.active = false;
-    InsertionState.keyId = null;
-    InsertionState.keyValue = null;
-    InsertionState.keyIndex = -1;
-    InsertionState.keyOriginIndex = -1;
-    InsertionState.compareIndex = -1;
-    InsertionState.sortedEnd = 0;
-    recentReads.length = 0;
-
-    if (window.VizHL) VizHL.clearAll();
-    clearNodeClasses();
-    setSortedPrefix(0);
-    _renderChips();
-  }
-
-  function isInsertionCompareWithConst(p) {
+  function isConstCompare(p) {
     if (!p || p.kind !== 'compareEx') return false;
     if (String(p.op || '').trim() !== '>') return false;
     const iNum = Number.isInteger(p.i) && p.i >= 0;
@@ -168,63 +162,124 @@
     return -1;
   }
 
-  function constValueFromCompare(p) {
+  function keyValueFromConst(p) {
     if (Number.isInteger(p.i) && p.i >= 0 && p.j === -1) return p.bj;
     if (Number.isInteger(p.j) && p.j >= 0 && p.i === -1) return p.ai;
     return null;
   }
 
-  function handleInsertionMove(p) {
-    if (!InsertionState.active) return ctx.handleGenericEvent(p);
-    if (!Number.isInteger(p.from) || !Number.isInteger(p.to)) return;
-    if (!window.VizState || !VizState._S || !Array.isArray(VizState._S.order)) return;
-    if (p.from < 0 || p.to < 0 || p.from >= VizState._S.order.length || p.to >= VizState._S.order.length) return;
+  function detectKeyOrigin(compareIndex, keyValue) {
+    let origin = compareIndex + 1;
+    for (let i = recentReads.length - 1; i >= 0; i--) {
+      const rr = recentReads[i];
+      if (!Number.isInteger(rr.index)) continue;
+      if (rr.index <= compareIndex) continue;
+      if (rr.value !== keyValue) continue;
+      origin = rr.index;
+      break;
+    }
+    if (!window.VizState || !VizState._S || !Array.isArray(VizState._S.order)) return origin;
+    if (origin < 0 || origin >= VizState._S.order.length) return compareIndex + 1;
+    return origin;
+  }
 
-    VizState.moveOrder(p.from, p.to);
-    InsertionState.keyIndex = findIndexById(InsertionState.keyId);
-    layoutWithLift(moveMs());
+  function beginKey(compareIndex, keyValue) {
+    if (!Number.isFinite(keyValue)) return;
+    State.active = true;
+    State.keyValue = Math.trunc(keyValue);
+    State.keyOriginIndex = detectKeyOrigin(compareIndex, State.keyValue);
+    State.compareIndex = compareIndex;
+    State.awaitingInsert = false;
+    showKeyBadge(State.keyValue);
+  }
+
+  function finishKeyInsertion() {
+    if (!State.active) return;
+    State.active = false;
+    State.awaitingInsert = false;
+    State.compareIndex = -1;
+    State.sortedEnd = Math.max(State.sortedEnd, State.keyOriginIndex);
+    State.keyOriginIndex = -1;
+    State.keyValue = null;
+    hideKeyBadge();
+    setSortedPrefix(State.sortedEnd);
     _renderChips();
-    return moveMs();
   }
 
-  function handleInsertionSet(p) {
-    if (!InsertionState.active) return ctx.handleGenericEvent(p);
-    if (!Number.isInteger(p.i)) return;
+  function resetInsertionSortState() {
+    State.active = false;
+    State.keyValue = null;
+    State.keyOriginIndex = -1;
+    State.compareIndex = -1;
+    State.sortedEnd = 0;
+    State.awaitingInsert = false;
+    recentReads.length = 0;
 
-    // Intermediate writes during shifts are ignored visually (nodes already moved).
-    // Final insertion writes key into current gap index.
-    if (p.i === InsertionState.keyIndex) {
-      finishKeyInsertion();
-      return moveMs();
-    }
-    return;
+    hideKeyBadge();
+    if (window.VizHL) VizHL.clearAll();
+    clearNodeClasses();
+    setSortedPrefix(0);
+    _renderChips();
   }
 
-  function handleInsertionCompare(p) {
-    if (!isInsertionCompareWithConst(p)) return ctx.handleGenericEvent(p);
+  function handleCompareEx(p) {
+    if (!isConstCompare(p)) return ctx.handleGenericEvent(p);
 
-    const compareIndex = compareIndexFromConst(p);
-    const keyValue = constValueFromCompare(p);
+    const cmpIndex = compareIndexFromConst(p);
+    const keyValue = keyValueFromConst(p);
+    const result = p.result === true;
 
-    // Safety for edge cases: if previous key is still active and we already moved
-    // to the next iteration, close previous insertion first.
-    if (InsertionState.active && Number.isInteger(compareIndex) && Number.isInteger(InsertionState.keyIndex)) {
-      if (compareIndex >= InsertionState.keyIndex) {
-        finishKeyInsertion();
-      }
+    if (!State.active && result && Number.isInteger(cmpIndex) && Number.isFinite(keyValue)) {
+      beginKey(cmpIndex, keyValue);
     }
 
-    if (!InsertionState.active && Number.isInteger(compareIndex)) {
-      beginKey(compareIndex, keyValue);
+    if (State.active) {
+      State.compareIndex = cmpIndex;
+      if (result === false) State.awaitingInsert = true;
+    } else if (Number.isInteger(cmpIndex)) {
+      // Iteration without shifts still extends sorted prefix.
+      State.sortedEnd = Math.max(State.sortedEnd, cmpIndex + 1);
+      setSortedPrefix(State.sortedEnd);
     }
 
-    InsertionState.compareIndex = compareIndex;
-    if (window.VizHL && Number.isInteger(compareIndex) && Number.isInteger(InsertionState.keyIndex)) {
-      VizHL.pulseCompare(compareIndex, InsertionState.keyIndex);
+    if (window.VizHL && Number.isInteger(cmpIndex)) {
+      const j = Number.isInteger(State.keyOriginIndex) && State.keyOriginIndex >= 0
+        ? Math.min(State.keyOriginIndex, cmpIndex + 1)
+        : cmpIndex + 1;
+      VizHL.pulseCompare(cmpIndex, j);
     }
 
     _renderChips();
     return pulseMs();
+  }
+
+  function handleMove(p) {
+    if (!Number.isInteger(p.from) || !Number.isInteger(p.to)) return;
+    const value = Number.isFinite(p.value) ? Math.trunc(p.value) : NaN;
+    animateShiftCopy(p.from, p.to, value);
+    return moveMs();
+  }
+
+  function handleSet(p) {
+    if (!Number.isInteger(p.i)) return;
+    const value = Number.isFinite(p.value) ? Math.trunc(p.value) : 0;
+
+    setNodeValue(p.i, value);
+    if (window.VizHL && VizHL.pulseWrite) VizHL.pulseWrite(p.i);
+
+    if (State.active) {
+      const isFinalByValue = Number.isFinite(State.keyValue) && value === State.keyValue && p.i <= State.keyOriginIndex;
+      const isFinalByAwait = State.awaitingInsert && p.i <= State.keyOriginIndex;
+      if (isFinalByValue || isFinalByAwait) {
+        finishKeyInsertion();
+      }
+    } else {
+      State.sortedEnd = Math.max(State.sortedEnd, p.i);
+      setSortedPrefix(State.sortedEnd);
+    }
+
+    _renderChips();
+    return writeMs();
   }
 
   function handleInsertionEvent(p) {
@@ -238,26 +293,17 @@
 
     if (p.kind === 'read' && Number.isInteger(p.i)) {
       recentReads.push({ index: p.i, value: p.value });
-      if (recentReads.length > 32) recentReads.shift();
+      if (recentReads.length > 48) recentReads.shift();
       return ctx.handleGenericEvent(p);
     }
 
-    if (p.kind === 'compareEx') {
-      return handleInsertionCompare(p);
-    }
+    if (p.kind === 'compareEx') return handleCompareEx(p);
+    if (p.kind === 'move') return handleMove(p);
+    if (p.kind === 'set') return handleSet(p);
 
-    if (p.kind === 'move') {
-      return handleInsertionMove(p);
-    }
-
-    if (p.kind === 'set') {
-      return handleInsertionSet(p);
-    }
-
-    if (p.kind === 'swap' && Number.isInteger(p.i) && Number.isInteger(p.j)) {
-      if (window.VizHL) VizHL.pulseSwap(p.i, p.j);
-      ctx.animateSwap(p.i, p.j);
-      return moveMs();
+    if (p.kind === 'swap') {
+      // For insertion sort we intentionally avoid swap semantics in auto-animation.
+      return;
     }
 
     return ctx.handleGenericEvent(p);
@@ -266,7 +312,11 @@
   function _renderChips() {
     const box = document.getElementById('chips');
     if (!box) return;
-    const arr = ctx.getCurrentArray();
+
+    const arr = Array.isArray(window.currentArray)
+      ? window.currentArray
+      : (ctx.getCurrentArray ? ctx.getCurrentArray() : []);
+
     box.innerHTML = '';
     if (!arr.length) {
       box.textContent = '— пусто —';
@@ -277,22 +327,18 @@
       const chip = document.createElement('span');
       chip.className = 'chip';
       chip.textContent = String(v);
-      if (InsertionState.active && idx === InsertionState.keyIndex) chip.classList.add('key');
-      else if (InsertionState.active && idx === InsertionState.compareIndex) chip.classList.add('comparing');
-      else if (idx <= InsertionState.sortedEnd) chip.classList.add('sorted');
+      if (State.active && idx === State.compareIndex) chip.classList.add('comparing');
+      else if (idx <= State.sortedEnd) chip.classList.add('sorted');
       chip.title = `index: ${idx}, value: ${v}`;
       box.appendChild(chip);
     });
   }
 
   function forceCompleteAllInsertions() {
-    if (InsertionState.active) {
-      InsertionState.active = false;
-      layoutWithLift(0);
-    }
+    if (State.active) finishKeyInsertion();
     if (window.VizState && VizState._S && Array.isArray(VizState._S.order)) {
-      InsertionState.sortedEnd = Math.max(0, VizState._S.order.length - 1);
-      setSortedPrefix(InsertionState.sortedEnd);
+      State.sortedEnd = Math.max(0, VizState._S.order.length - 1);
+      setSortedPrefix(State.sortedEnd);
     }
     _renderChips();
   }
@@ -301,11 +347,10 @@
     handle: handleInsertionEvent,
     reset: resetInsertionSortState,
     renderChips: _renderChips,
-    playback: (playing) => { InsertionState.isPlaying = playing; }
+    playback: (playing) => { State.isPlaying = playing; }
   });
 
   if (ctx.setRenderChips) ctx.setRenderChips(_renderChips);
-
   window.VizScene.resetInsertionSortState = resetInsertionSortState;
   window.VizScene.forceCompleteAllInsertions = forceCompleteAllInsertions;
 })();

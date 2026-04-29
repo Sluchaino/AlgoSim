@@ -78,6 +78,30 @@ svg { max-width: 100%; height: auto; display: block; }
   font-weight: 700;
 }
 
+.insertion-key-badge {
+  position: absolute;
+  top: 10px;
+  right: 10px;
+  padding: 6px 10px;
+  border-radius: 8px;
+  border: 1px solid #f59e0b;
+  background: rgba(255, 247, 237, 0.96);
+  color: #7c2d12;
+  font-size: 12px;
+  font-weight: 700;
+  letter-spacing: 0.01em;
+  pointer-events: none;
+  z-index: 6;
+  opacity: 0;
+  transform: translateY(-4px);
+  transition: opacity .14s linear, transform .14s linear;
+}
+
+.insertion-key-badge.is-visible {
+  opacity: 1;
+  transform: translateY(0);
+}
+
 /* Р‘Р°Р·РѕРІС‹Рµ СЃС‚РёР»Рё РґР»СЏ СѓР·Р»РѕРІ */
 #stage .item { will-change: transform; }
 #stage .item circle {
@@ -131,6 +155,16 @@ svg { max-width: 100%; height: auto; display: block; }
   stroke-width: 3px;
   fill: #ff9a9a !important;
   filter: drop-shadow(0 0 8px rgba(255, 110, 110, 0.55));
+}
+#stage .item.shift-ghost circle {
+  stroke: #60a5fa;
+  fill: #1d4ed8 !important;
+  stroke-width: 2px;
+  opacity: 0.92;
+  filter: drop-shadow(0 0 6px rgba(59, 130, 246, 0.45));
+}
+#stage .item.shift-ghost text {
+  fill: #eaf2ff;
 }
 #stage .item.write circle {
   stroke: #16a34a;
