@@ -1,250 +1,265 @@
-﻿// insertion.js - auto animation for insertion sort
+﻿// insertion.js - auto animation for insertion sort with lifted key and shifts
 (function () {
   if (!window.VizScene || !window.VizSceneCtx) return;
   const ctx = window.VizSceneCtx;
 
-  const InsertionSortState = {
-    keyIndex: -1,
-    sortedEndIndex: 0,
-    isPlaying: false,
-    keyNode: null,
-    isKeyActive: false,
+  const KEY_LIFT_Y = 46;
+  const recentReads = [];
+
+  const InsertionState = {
+    active: false,
+    keyId: null,
     keyValue: null,
-    currentCompareIndex: -1
+    keyIndex: -1,
+    keyOriginIndex: -1,
+    compareIndex: -1,
+    sortedEnd: 0,
+    isPlaying: false
   };
 
-  function resetInsertionSortState() {
-    if (window.VizState && VizState._S && VizState._S.order) {
-      VizState._S.order.forEach((_, index) => {
-        const node = VizState.nodeAtIndex(index);
-        if (node) {
-          node.classList.remove('key');
-          node.classList.remove('compare');
-        }
-      });
-    }
-
-    InsertionSortState.keyIndex = -1;
-    InsertionSortState.sortedEndIndex = 0;
-    InsertionSortState.keyNode = null;
-    InsertionSortState.isKeyActive = false;
-    InsertionSortState.keyValue = null;
-    InsertionSortState.currentCompareIndex = -1;
-
-    if (window.VizHL) {
-      VizHL.clearAll();
-    }
-
-    updateSortedVisualization();
+  function moveMs() {
+    return Math.round(((window.VizDUR && VizDUR.move) ? VizDUR.move : 0.35) * 1000);
   }
 
-  function visualizeTakeKey(keyIndex) {
-    if (keyIndex < 1 || keyIndex >= ctx.getCurrentArray().length) return;
-
-    if (InsertionSortState.isKeyActive) {
-      resetKeyVisualization();
-    }
-
-    InsertionSortState.keyIndex = keyIndex;
-    InsertionSortState.isKeyActive = true;
-    InsertionSortState.keyValue = ctx.getCurrentArray()[keyIndex];
-    InsertionSortState.keyNode = VizState.nodeAtIndex(keyIndex);
-
-    if (InsertionSortState.keyNode) {
-      InsertionSortState.keyNode.classList.add('key');
-    }
-
-    if (InsertionSortState.keyNode && window.gsap) {
-      gsap.to(InsertionSortState.keyNode, {
-        y: -40,
-        scale: 1.1,
-        duration: VizDUR.move,
-        ease: 'power2.out'
-      });
-    }
-
-    _renderChips();
+  function pulseMs() {
+    return Math.round(((window.VizDUR && VizDUR.pulse) ? VizDUR.pulse : 0.25) * 1000);
   }
 
-  function resetKeyVisualization() {
-    if (InsertionSortState.keyNode) {
-      InsertionSortState.keyNode.classList.remove('key');
-      if (window.gsap) {
-        gsap.to(InsertionSortState.keyNode, {
-          y: 0,
-          scale: 1,
-          duration: VizDUR.move,
-          ease: 'power2.in'
-        });
-      }
-    }
-  }
-
-  function visualizeCompare(compareIndex) {
-    if (compareIndex < 0 || !InsertionSortState.isKeyActive) return;
-
-    if (InsertionSortState.currentCompareIndex !== -1) {
-      const prevNode = VizState.nodeAtIndex(InsertionSortState.currentCompareIndex);
-      if (prevNode) {
-        prevNode.classList.remove('compare');
-      }
-    }
-
-    InsertionSortState.currentCompareIndex = compareIndex;
-    const compareNode = VizState.nodeAtIndex(compareIndex);
-    if (compareNode) {
-      compareNode.classList.add('compare');
-      if (window.gsap) {
-        gsap.delayedCall(VizDUR.pulse, () => {
-          if (compareNode.classList.contains('compare')) {
-            compareNode.classList.remove('compare');
-          }
-        });
-      }
-    }
-
-    _renderChips();
-  }
-
-  function visualizeShift(fromIndex, toIndex) {
-    if (fromIndex < 0 || toIndex < 0) return;
-
-    const arr = ctx.getCurrentArray();
-    const [movedItem] = arr.splice(fromIndex, 1);
-    arr.splice(toIndex, 0, movedItem);
-    window.currentArray = arr;
-
-    VizState.moveOrder(fromIndex, toIndex);
-    VizState.layout(VizDUR.move);
-    ctx.refreshPtrs();
-
-    _renderChips();
-  }
-
-  function completeKeyInsertion() {
-    if (!InsertionSortState.isKeyActive) return;
-
-    if (InsertionSortState.currentCompareIndex !== -1) {
-      const compareNode = VizState.nodeAtIndex(InsertionSortState.currentCompareIndex);
-      if (compareNode) {
-        compareNode.classList.remove('compare');
-      }
-      InsertionSortState.currentCompareIndex = -1;
-    }
-
-    if (InsertionSortState.keyNode && window.gsap) {
-      gsap.to(InsertionSortState.keyNode, {
-        y: 0,
-        scale: 1,
-        duration: VizDUR.move,
-        ease: 'back.out(1.7)',
-        onComplete: () => {
-          finalizeKeyInsertion();
-        }
-      });
-    } else {
-      finalizeKeyInsertion();
-    }
-  }
-
-  function finalizeKeyInsertion() {
-    InsertionSortState.sortedEndIndex = Math.max(InsertionSortState.sortedEndIndex, InsertionSortState.keyIndex);
-    updateSortedVisualization();
-
-    resetKeyVisualization();
-    InsertionSortState.keyIndex = -1;
-    InsertionSortState.isKeyActive = false;
-    InsertionSortState.keyValue = null;
-    InsertionSortState.keyNode = null;
-
-    _renderChips();
-  }
-
-  function updateSortedVisualization() {
-    if (!window.VizHL || !window.VizState) return;
-
+  function clearNodeClasses() {
+    if (!window.VizState || !VizState._S || !VizState._S.order) return;
     VizState._S.order.forEach((_, index) => {
       const node = VizState.nodeAtIndex(index);
-      if (node) {
-        node.classList.remove('sorted');
+      if (!node) return;
+      node.classList.remove('key', 'compare', 'sorted');
+    });
+  }
+
+  function setSortedPrefix(endIndex) {
+    if (!window.VizState || !VizState._S || !VizState._S.order) return;
+    VizState._S.order.forEach((_, index) => {
+      const node = VizState.nodeAtIndex(index);
+      if (!node) return;
+      node.classList.remove('sorted');
+      if (index <= endIndex && (!InsertionState.active || index !== InsertionState.keyIndex)) {
+        node.classList.add('sorted');
+      }
+    });
+  }
+
+  function findIndexById(id) {
+    if (!id || !window.VizState || !VizState._S || !Array.isArray(VizState._S.order)) return -1;
+    for (let i = 0; i < VizState._S.order.length; i++) {
+      if (VizState._S.order[i].id === id) return i;
+    }
+    return -1;
+  }
+
+  function layoutWithLift(durationMs) {
+    if (!window.VizState || !VizState._S || !Array.isArray(VizState._S.order)) return;
+    const S = VizState._S;
+    const xs = VizState.centersX(S.order);
+    const durationSec = Math.max(0, Number(durationMs || 0) / 1000);
+
+    S.order.forEach((item, index) => {
+      const node = S.nodesById.get(item.id);
+      if (!node) return;
+      const isKeyNode = InsertionState.active && item.id === InsertionState.keyId;
+      const y = isKeyNode ? (VizCFG.CY - KEY_LIFT_Y) : VizCFG.CY;
+      const x = xs[index];
+
+      if (window.gsap) {
+        if (durationSec > 0) {
+          gsap.to(node, { x, y, duration: durationSec, ease: 'none', overwrite: 'auto' });
+        } else {
+          gsap.set(node, { x, y });
+        }
+      } else {
+        node.style.transform = `translate(${x}px, ${y}px)`;
       }
     });
 
-    for (let i = 0; i <= InsertionSortState.sortedEndIndex; i++) {
-      if (!InsertionSortState.isKeyActive || i !== InsertionSortState.keyIndex) {
-        VizHL.markNode(i, 'sorted');
-      }
-    }
+    if (window.VizRanges) VizRanges.recompute();
+    ctx.refreshPtrs(durationSec);
   }
 
-  function updateInsertionSortedFromCompare(i, j) {
-    if (!Number.isInteger(i) || !Number.isInteger(j)) return;
-    const lo = Math.min(i, j);
-    const hi = Math.max(i, j);
-    if (hi === lo + 1 && hi - 1 > InsertionSortState.sortedEndIndex) {
-      InsertionSortState.sortedEndIndex = hi - 1;
-      updateSortedVisualization();
-      _renderChips();
+  function beginKey(compareIndex, keyValue) {
+    if (!window.VizState || !VizState._S || !Array.isArray(VizState._S.order)) return;
+    if (!Number.isInteger(compareIndex)) return;
+
+    let keyIndex = -1;
+    for (let i = recentReads.length - 1; i >= 0; i--) {
+      const rr = recentReads[i];
+      if (!Number.isInteger(rr.index)) continue;
+      if (rr.index <= compareIndex) continue;
+      if (rr.value !== keyValue) continue;
+      keyIndex = rr.index;
+      break;
     }
+    if (!Number.isInteger(keyIndex) || keyIndex < 0) {
+      keyIndex = compareIndex + 1;
+    }
+    if (keyIndex < 0 || keyIndex >= VizState._S.order.length) return;
+
+    const keyNode = VizState.nodeAtIndex(keyIndex);
+    if (!keyNode) return;
+    const item = VizState._S.order[keyIndex];
+    if (!item) return;
+
+    InsertionState.active = true;
+    InsertionState.keyId = item.id;
+    InsertionState.keyValue = keyValue;
+    InsertionState.keyIndex = keyIndex;
+    InsertionState.keyOriginIndex = keyIndex;
+    InsertionState.compareIndex = compareIndex;
+
+    keyNode.classList.add('key');
+    layoutWithLift(moveMs());
   }
 
-  function finalizeInsertionIfSorted() {
-    if (!window.VizState || !VizState._S || !VizState._S.order) return;
-    const arr = VizState._S.order;
-    if (!arr.length) return;
-    for (let k = 1; k < arr.length; k++) {
-      if (arr[k - 1].value > arr[k].value) return;
+  function finishKeyInsertion() {
+    if (!InsertionState.active) return;
+
+    const keyId = InsertionState.keyId;
+    if (keyId && window.VizState && VizState._S && VizState._S.nodesById) {
+      const keyNode = VizState._S.nodesById.get(keyId);
+      if (keyNode) keyNode.classList.remove('key');
     }
-    InsertionSortState.sortedEndIndex = arr.length - 1;
-    updateSortedVisualization();
+
+    InsertionState.active = false;
+    InsertionState.compareIndex = -1;
+    InsertionState.keyId = null;
+    InsertionState.keyValue = null;
+    InsertionState.keyIndex = -1;
+    InsertionState.sortedEnd = Math.max(InsertionState.sortedEnd, InsertionState.keyOriginIndex);
+    InsertionState.keyOriginIndex = -1;
+
+    layoutWithLift(moveMs());
+    setSortedPrefix(InsertionState.sortedEnd);
     _renderChips();
   }
 
+  function resetInsertionSortState() {
+    InsertionState.active = false;
+    InsertionState.keyId = null;
+    InsertionState.keyValue = null;
+    InsertionState.keyIndex = -1;
+    InsertionState.keyOriginIndex = -1;
+    InsertionState.compareIndex = -1;
+    InsertionState.sortedEnd = 0;
+    recentReads.length = 0;
+
+    if (window.VizHL) VizHL.clearAll();
+    clearNodeClasses();
+    setSortedPrefix(0);
+    _renderChips();
+  }
+
+  function isInsertionCompareWithConst(p) {
+    if (!p || p.kind !== 'compareEx') return false;
+    if (String(p.op || '').trim() !== '>') return false;
+    const iNum = Number.isInteger(p.i) && p.i >= 0;
+    const jNum = Number.isInteger(p.j) && p.j >= 0;
+    return (iNum && p.j === -1) || (jNum && p.i === -1);
+  }
+
+  function compareIndexFromConst(p) {
+    if (Number.isInteger(p.i) && p.i >= 0 && p.j === -1) return p.i;
+    if (Number.isInteger(p.j) && p.j >= 0 && p.i === -1) return p.j;
+    return -1;
+  }
+
+  function constValueFromCompare(p) {
+    if (Number.isInteger(p.i) && p.i >= 0 && p.j === -1) return p.bj;
+    if (Number.isInteger(p.j) && p.j >= 0 && p.i === -1) return p.ai;
+    return null;
+  }
+
+  function handleInsertionMove(p) {
+    if (!InsertionState.active) return ctx.handleGenericEvent(p);
+    if (!Number.isInteger(p.from) || !Number.isInteger(p.to)) return;
+    if (!window.VizState || !VizState._S || !Array.isArray(VizState._S.order)) return;
+    if (p.from < 0 || p.to < 0 || p.from >= VizState._S.order.length || p.to >= VizState._S.order.length) return;
+
+    VizState.moveOrder(p.from, p.to);
+    InsertionState.keyIndex = findIndexById(InsertionState.keyId);
+    layoutWithLift(moveMs());
+    _renderChips();
+    return moveMs();
+  }
+
+  function handleInsertionSet(p) {
+    if (!InsertionState.active) return ctx.handleGenericEvent(p);
+    if (!Number.isInteger(p.i)) return;
+
+    // Intermediate writes during shifts are ignored visually (nodes already moved).
+    // Final insertion writes key into current gap index.
+    if (p.i === InsertionState.keyIndex) {
+      finishKeyInsertion();
+      return moveMs();
+    }
+    return;
+  }
+
+  function handleInsertionCompare(p) {
+    if (!isInsertionCompareWithConst(p)) return ctx.handleGenericEvent(p);
+
+    const compareIndex = compareIndexFromConst(p);
+    const keyValue = constValueFromCompare(p);
+
+    if (!InsertionState.active && Number.isInteger(compareIndex)) {
+      beginKey(compareIndex, keyValue);
+    }
+
+    InsertionState.compareIndex = compareIndex;
+    if (window.VizHL && Number.isInteger(compareIndex) && Number.isInteger(InsertionState.keyIndex)) {
+      VizHL.pulseCompare(compareIndex, InsertionState.keyIndex);
+    }
+
+    _renderChips();
+    return pulseMs();
+  }
+
   function handleInsertionEvent(p) {
+    if (!p || typeof p !== 'object') return;
+
     if (p.kind === 'setArray' && Array.isArray(p.value)) {
       ctx.setCurrentArray(p.value);
       resetInsertionSortState();
       return;
     }
 
-    if (p.kind === 'compare') {
-      return;
+    if (p.kind === 'read' && Number.isInteger(p.i)) {
+      recentReads.push({ index: p.i, value: p.value });
+      if (recentReads.length > 32) recentReads.shift();
+      return ctx.handleGenericEvent(p);
     }
 
     if (p.kind === 'compareEx') {
-      const i = p.i;
-      const j = p.j;
-      if (Number.isInteger(i) && Number.isInteger(j)) {
-        const pulseMs = (window.VizDUR ? (VizDUR.pulse || 0.25) : 0.25) * 1000;
-        if (window.VizHL) VizHL.pulseCompare(i, j);
-        updateInsertionSortedFromCompare(i, j);
-        return Math.round(pulseMs);
-      }
-      updateInsertionSortedFromCompare(p.i, p.j);
-      return;
+      return handleInsertionCompare(p);
     }
 
-    if (p.kind === 'read') {
-      return ctx.handleGenericEvent(p);
+    if (p.kind === 'move') {
+      return handleInsertionMove(p);
+    }
+
+    if (p.kind === 'set') {
+      return handleInsertionSet(p);
     }
 
     if (p.kind === 'swap' && Number.isInteger(p.i) && Number.isInteger(p.j)) {
       if (window.VizHL) VizHL.pulseSwap(p.i, p.j);
       ctx.animateSwap(p.i, p.j);
-      finalizeInsertionIfSorted();
-      return;
+      return moveMs();
     }
 
-    ctx.handleGenericEvent(p);
+    return ctx.handleGenericEvent(p);
   }
 
   function _renderChips() {
     const box = document.getElementById('chips');
     if (!box) return;
-
     const arr = ctx.getCurrentArray();
     box.innerHTML = '';
-
     if (!arr.length) {
       box.textContent = '— пусто —';
       return;
@@ -253,31 +268,24 @@
     arr.forEach((v, idx) => {
       const chip = document.createElement('span');
       chip.className = 'chip';
-
-      if (InsertionSortState.isKeyActive && idx === InsertionSortState.keyIndex) {
-        chip.classList.add('key');
-        chip.textContent = '🔑' + v;
-      } else if (InsertionSortState.isKeyActive && idx === InsertionSortState.currentCompareIndex) {
-        chip.classList.add('comparing');
-        chip.textContent = String(v);
-      } else if (idx <= InsertionSortState.sortedEndIndex) {
-        chip.classList.add('sorted');
-        chip.textContent = String(v);
-      } else {
-        chip.textContent = String(v);
-      }
-
+      chip.textContent = String(v);
+      if (InsertionState.active && idx === InsertionState.keyIndex) chip.classList.add('key');
+      else if (InsertionState.active && idx === InsertionState.compareIndex) chip.classList.add('comparing');
+      else if (idx <= InsertionState.sortedEnd) chip.classList.add('sorted');
       chip.title = `index: ${idx}, value: ${v}`;
       box.appendChild(chip);
     });
   }
 
   function forceCompleteAllInsertions() {
-    if (InsertionSortState.isKeyActive) {
-      completeKeyInsertion();
+    if (InsertionState.active) {
+      InsertionState.active = false;
+      layoutWithLift(0);
     }
-    InsertionSortState.sortedEndIndex = ctx.getCurrentArray().length - 1;
-    updateSortedVisualization();
+    if (window.VizState && VizState._S && Array.isArray(VizState._S.order)) {
+      InsertionState.sortedEnd = Math.max(0, VizState._S.order.length - 1);
+      setSortedPrefix(InsertionState.sortedEnd);
+    }
     _renderChips();
   }
 
@@ -285,7 +293,7 @@
     handle: handleInsertionEvent,
     reset: resetInsertionSortState,
     renderChips: _renderChips,
-    playback: (playing) => { InsertionSortState.isPlaying = playing; }
+    playback: (playing) => { InsertionState.isPlaying = playing; }
   });
 
   if (ctx.setRenderChips) ctx.setRenderChips(_renderChips);

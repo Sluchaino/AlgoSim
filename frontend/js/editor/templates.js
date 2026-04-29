@@ -12,12 +12,15 @@ class Program
   {
     for (int i = 1; i < a.Count; i++)
     {
-      int j = i;
-      while (j > 0 && a[j - 1] > a[j])
+      int key = a[i];
+      int j = i - 1;
+
+      while (j >= 0 && a[j] > key)
       {
-        a.Swap(j - 1, j);
+        a[j + 1] = a[j];
         j--;
       }
+      a[j + 1] = key;
     }
   }
 
