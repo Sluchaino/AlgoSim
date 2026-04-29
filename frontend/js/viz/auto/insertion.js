@@ -206,6 +206,14 @@
     const compareIndex = compareIndexFromConst(p);
     const keyValue = constValueFromCompare(p);
 
+    // Safety for edge cases: if previous key is still active and we already moved
+    // to the next iteration, close previous insertion first.
+    if (InsertionState.active && Number.isInteger(compareIndex) && Number.isInteger(InsertionState.keyIndex)) {
+      if (compareIndex >= InsertionState.keyIndex) {
+        finishKeyInsertion();
+      }
+    }
+
     if (!InsertionState.active && Number.isInteger(compareIndex)) {
       beginKey(compareIndex, keyValue);
     }

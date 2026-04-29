@@ -1163,9 +1163,18 @@ ${printLine}
 
   const player = new LogPlayer((item) => processPlaybackItem(item));
 
+  function finalizeTailVisualStateIfNeeded() {
+    if (timelineAlgo === 'insertion' && window.VizScene && typeof window.VizScene.forceCompleteAllInsertions === 'function') {
+      window.VizScene.forceCompleteAllInsertions();
+    }
+  }
+
   function updatePlayPauseLabel(playing) {
     if (!btnPlayPause) return;
     btnPlayPause.textContent = playing ? 'Пауза' : 'Воспроизвести';
+    if (!playing && player.queue && player.queue.length === 0) {
+      finalizeTailVisualStateIfNeeded();
+    }
   }
   player.onStateChange = updatePlayPauseLabel;
   updatePlayPauseLabel(false);
@@ -1202,6 +1211,9 @@ ${printLine}
     timelineCursor = next;
     refreshStepCursorUi();
     rebuildQueueFromCursor();
+    if (next >= total) {
+      finalizeTailVisualStateIfNeeded();
+    }
   }
 
   function clearTimeline() {
@@ -1272,7 +1284,12 @@ ${printLine}
     replayTimeline();
   });
 
-  btnStep && btnStep.addEventListener('click', () => player.stepOnce());
+  btnStep && btnStep.addEventListener('click', () => {
+    player.stepOnce();
+    if (!player.isPlaying && player.queue && player.queue.length === 0) {
+      finalizeTailVisualStateIfNeeded();
+    }
+  });
   inpSpeedSwap && inpSpeedSwap.addEventListener('input', () => {
     applySpeedConfig(false);
   });
