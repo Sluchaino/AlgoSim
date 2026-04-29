@@ -13,8 +13,40 @@
     lastReadIndex: -1,
     lastReadValue: null,
     compareToken: 0,
-    lastCompareOp: null
+    lastCompareOp: null,
+    sortedMarked: false
   };
+
+  function clearQuickSortedMarks() {
+    if (!window.VizState || !VizState._S || !Array.isArray(VizState._S.order)) return;
+    for (let i = 0; i < VizState._S.order.length; i++) {
+      ctx.clearMarkAt(i, 'sorted');
+    }
+    QuickSortState.sortedMarked = false;
+  }
+
+  function isCurrentArraySorted() {
+    if (!window.VizState || !VizState._S || !Array.isArray(VizState._S.order)) return false;
+    const arr = VizState._S.order;
+    if (arr.length <= 1) return true;
+    for (let i = 1; i < arr.length; i++) {
+      if (arr[i - 1].value > arr[i].value) return false;
+    }
+    return true;
+  }
+
+  function updateQuickSortedMarks() {
+    if (!window.VizState || !VizState._S || !Array.isArray(VizState._S.order)) return;
+    const sortedNow = isCurrentArraySorted();
+    if (!sortedNow) {
+      if (QuickSortState.sortedMarked) clearQuickSortedMarks();
+      return;
+    }
+    for (let i = 0; i < VizState._S.order.length; i++) {
+      ctx.setMarkAt(i, 'sorted');
+    }
+    QuickSortState.sortedMarked = true;
+  }
 
   function resetQuickSortState() {
     QuickSortState.i = null;
@@ -31,6 +63,7 @@
     if (window.VizRanges && VizRanges.remove) {
       VizRanges.remove('partition');
     }
+    clearQuickSortedMarks();
     ctx.clearPtr('i');
     ctx.clearPtr('j');
   }
@@ -156,6 +189,7 @@
     if (p.kind === 'setArray' && Array.isArray(p.value)) {
       ctx.setCurrentArray(p.value);
       resetQuickSortState();
+      updateQuickSortedMarks();
       return;
     }
 
@@ -233,6 +267,7 @@
       if (window.VizHL) VizHL.pulseSwap(p.i, p.j);
       ctx.animateSwap(p.i, p.j);
       updateQuickPivotFromValue();
+      updateQuickSortedMarks();
       return;
     }
 

@@ -256,8 +256,17 @@
     applyTemplateFromContext();
   })();
 
-  // Update template when algo or mode changes
-  window.addEventListener('hashchange', () => applyTemplateFromContext());
+  // Update template when algo changes and keep step timeline isolated per tab
+  let lastAlgoForTimeline = getAlgoKey();
+  window.addEventListener('hashchange', () => {
+    const nextAlgo = getAlgoKey();
+    applyTemplateFromContext();
+    if (nextAlgo !== lastAlgoForTimeline) {
+      clearTimeline();
+      setStatus('Idle');
+    }
+    lastAlgoForTimeline = nextAlgo;
+  });
   const modeInputs = Array.from(document.querySelectorAll('input[name="algo-mode"]'));
   modeInputs.forEach(input => {
     input.addEventListener('change', () => applyTemplateFromContext());
@@ -1671,6 +1680,14 @@ ${printLine}
         log('[stderr] ' + result.error);
       }
       const stepPayloads = parseStepPayloads(result && result.output ? result.output : '', algoName);
+
+      const activeAlgo = getAlgoKey();
+      if (activeAlgo !== algoName) {
+        log(`[info] Результат "${algoName}" получен, но сейчас открыта вкладка "${activeAlgo}". Шаги не перенесены.`);
+        stopTimer();
+        return;
+      }
+
       loadTimeline(stepPayloads, pageArray, algoName);
 
       const auto = chkAutoplay ? !!chkAutoplay.checked : true;
