@@ -10,6 +10,9 @@
     removeNode: document.getElementById('remove-node'),
     deleteNode: document.getElementById('delete-node'),
     deleteEdge: document.getElementById('delete-edge'),
+    matrixLabels: document.getElementById('adj-matrix-labels'),
+    matrixInput: document.getElementById('adj-matrix-input'),
+    matrixMap: document.getElementById('adj-matrix-map'),
     start: document.getElementById('start-node'),
     end: document.getElementById('end-node'),
     nodesBox: document.getElementById('graph-nodes'),
@@ -20,6 +23,7 @@
   const nodes = [];
   const edges = [];
   const radius = 18;
+  let matrixAutoApplyTimer = 0;
   const nodeStates = new Map(); // label -> Set(state)
   const edgeStates = new Map(); // key -> Set(state)
   const nodeEls = new Map();    // label -> <g>
@@ -31,15 +35,19 @@
   const edgesLayer = ui.stage ? ui.stage.querySelector('.graph-edges-layer') : null;
   const nodesLayer = ui.stage ? ui.stage.querySelector('.graph-nodes-layer') : null;
 
-  function nextLabel() {
+  function labelByIndex(index) {
     const base = 'ABCDEFGHIJKLMNOPQRSTUVWXYZ';
-    let n = nodes.length;
+    let n = Number.isFinite(index) ? Math.max(0, Math.floor(index)) : 0;
     let out = '';
     do {
       out = base[n % base.length] + out;
       n = Math.floor(n / base.length) - 1;
     } while (n >= 0);
     return out;
+  }
+
+  function nextLabel() {
+    return labelByIndex(nodes.length);
   }
 
   function normalizeLabel(label) {
@@ -54,6 +62,46 @@
       i++;
     }
     return out;
+  }
+
+  function uniqueLabelInSet(label, used) {
+    let out = label;
+    let i = 1;
+    while (used.has(out)) {
+      out = `${label}${i}`;
+      i++;
+    }
+    used.add(out);
+    return out;
+  }
+
+  function splitLabelTokens(text) {
+    return String(text || '')
+      .split(/[,\s;]+/)
+      .map(token => token.trim())
+      .filter(Boolean);
+  }
+
+  function inferMatrixSizeFromInput(text) {
+    return String(text || '')
+      .split(/\r?\n/)
+      .map(line => line.trim())
+      .filter(Boolean)
+      .length;
+  }
+
+  function resolveMatrixLabelsForSize(size, labelsText) {
+    const n = Math.max(0, Number.isFinite(size) ? Math.floor(size) : 0);
+    const tokens = splitLabelTokens(labelsText);
+    const used = new Set();
+    const labels = [];
+    for (let i = 0; i < n; i++) {
+      const raw = normalizeLabel(tokens[i] || '');
+      const fallback = labelByIndex(i);
+      const candidate = raw || fallback;
+      labels.push(uniqueLabelInSet(candidate, used));
+    }
+    return labels;
   }
 
   function stageSize() {
@@ -134,6 +182,45 @@
     fillSelect(ui.removeNode, labels);
     fillSelect(ui.start, labels);
     fillSelect(ui.end, labels);
+  }
+
+  function buildAdjacencyMatrixFromGraph() {
+    const n = nodes.length;
+    const indexByLabel = new Map();
+    nodes.forEach((node, index) => indexByLabel.set(node.label, index));
+
+    const matrix = Array.from({ length: n }, () => Array(n).fill(0));
+    edges.forEach((edge) => {
+      const from = indexByLabel.get(edge.from);
+      const to = indexByLabel.get(edge.to);
+      if (!Number.isInteger(from) || !Number.isInteger(to)) return;
+      matrix[from][to] = 1;
+    });
+    return matrix;
+  }
+
+  function matrixToText(matrix) {
+    if (!Array.isArray(matrix) || !matrix.length) return '';
+    return matrix.map(row => row.join(' ')).join('\n');
+  }
+
+  function matrixLabelsSeedForSize(size) {
+    if (ui.matrixLabels) return ui.matrixLabels.value || '';
+    if (size <= 0) return '';
+    const labels = [];
+    for (let i = 0; i < size; i++) {
+      if (i < nodes.length && nodes[i] && nodes[i].label) labels.push(nodes[i].label);
+      else labels.push(labelByIndex(i));
+    }
+    return labels.join(' ');
+  }
+
+  function syncMatrixInputFromGraph() {
+    if (!ui.matrixInput) return;
+    const text = matrixToText(buildAdjacencyMatrixFromGraph());
+    if (ui.matrixInput.value !== text) {
+      ui.matrixInput.value = text;
+    }
   }
 
   function clearSvg() {
@@ -314,6 +401,8 @@
     renderEdgesList();
     syncSelects();
     renderGraph();
+    syncMatrixInputFromGraph();
+    renderMatrixMappingPreview();
   }
 
   function setNodeState(label, state, enabled = true) {
@@ -403,6 +492,8 @@
     edges.push({ from, to });
     renderEdgesList();
     updateEdges();
+    syncMatrixInputFromGraph();
+    renderMatrixMappingPreview();
   }
 
   function removeEdge(from, to) {
@@ -417,6 +508,8 @@
     edgeEls.delete(key);
     renderEdgesList();
     updateEdges();
+    syncMatrixInputFromGraph();
+    renderMatrixMappingPreview();
   }
 
   function removeNode(label) {
@@ -451,6 +544,158 @@
     syncUI();
   }
 
+  function renderMatrixMappingPreview() {
+    if (!ui.matrixMap) return;
+
+    const rawMatrix = ui.matrixInput ? ui.matrixInput.value : '';
+    const size = inferMatrixSizeFromInput(rawMatrix);
+    const labels = resolveMatrixLabelsForSize(size, matrixLabelsSeedForSize(size));
+
+    ui.matrixMap.innerHTML = '';
+
+    if (!size) {
+      ui.matrixMap.classList.add('is-hidden');
+      return;
+    }
+    ui.matrixMap.classList.remove('is-hidden');
+
+    const title = document.createElement('div');
+    title.className = 'adj-matrix-map-title';
+    title.textContent = `Порядок вершин для матрицы ${size}×${size}:`;
+    ui.matrixMap.appendChild(title);
+
+    const grid = document.createElement('div');
+    grid.className = 'adj-matrix-map-grid';
+    labels.forEach((label, index) => {
+      const item = document.createElement('button');
+      item.type = 'button';
+      item.className = 'adj-matrix-map-item';
+      item.textContent = `${index + 1} ↔ ${label}`;
+      item.title = `Строка и столбец ${index + 1} соответствуют вершине ${label}`;
+      item.addEventListener('click', () => {
+        if (!ui.nodeLabel) return;
+        ui.nodeLabel.value = label;
+        ui.nodeLabel.focus();
+        if (typeof ui.nodeLabel.select === 'function') ui.nodeLabel.select();
+      });
+      grid.appendChild(item);
+    });
+    ui.matrixMap.appendChild(grid);
+
+    try {
+      parseAdjacencyMatrixText(rawMatrix);
+    } catch (err) {
+      const error = document.createElement('div');
+      error.className = 'adj-matrix-map-error';
+      error.textContent = err && err.message ? err.message : 'Проверьте формат матрицы.';
+      ui.matrixMap.appendChild(error);
+    }
+  }
+
+  function parseAdjacencyMatrixText(text) {
+    const lines = String(text || '')
+      .split(/\r?\n/)
+      .map(line => line.trim())
+      .filter(Boolean);
+
+    if (!lines.length) {
+      throw new Error('Матрица пустая.');
+    }
+
+    const matrix = lines.map((line, rowIndex) => {
+      const tokens = line.split(/[\s,;]+/).filter(Boolean);
+      if (!tokens.length) {
+        throw new Error(`Пустая строка в матрице: ${rowIndex + 1}.`);
+      }
+      return tokens.map((token, colIndex) => {
+        const value = Number(token);
+        if (!Number.isFinite(value)) {
+          throw new Error(`Некорректное число в строке ${rowIndex + 1}, столбце ${colIndex + 1}: "${token}".`);
+        }
+        return value;
+      });
+    });
+
+    const n = matrix.length;
+    matrix.forEach((row, i) => {
+      if (row.length !== n) {
+        throw new Error(`Матрица должна быть квадратной: строка ${i + 1} содержит ${row.length} элементов, ожидалось ${n}.`);
+      }
+    });
+
+    return matrix;
+  }
+
+  function setGraphFromMatrix(matrix, labels) {
+    if (!Array.isArray(matrix) || !matrix.length) {
+      clearGraph();
+      return;
+    }
+
+    const previousNodeByLabel = new Map();
+    nodes.forEach((n) => {
+      previousNodeByLabel.set(n.label, { x: n.x, y: n.y, id: n.id });
+    });
+
+    nodes.length = 0;
+    edges.length = 0;
+    clearStates();
+
+    const n = matrix.length;
+    const resolvedLabels = Array.isArray(labels) && labels.length === n
+      ? labels
+      : resolveMatrixLabelsForSize(n, '');
+    for (let i = 0; i < n; i++) {
+      const label = resolvedLabels[i];
+      const oldNode = previousNodeByLabel.get(label);
+      const pos = oldNode || defaultPosition(i);
+      nodes.push({
+        id: oldNode && oldNode.id ? oldNode.id : ('n_' + Math.random().toString(36).slice(2, 8)),
+        label,
+        x: pos.x,
+        y: pos.y
+      });
+    }
+
+    const nodeLabels = nodes.map(n => n.label);
+    for (let i = 0; i < n; i++) {
+      for (let j = 0; j < n; j++) {
+        if (matrix[i][j] !== 0) {
+          edges.push({ from: nodeLabels[i], to: nodeLabels[j] });
+        }
+      }
+    }
+
+    syncUI();
+  }
+
+  function applyMatrixFromInputs() {
+    const matrixText = ui.matrixInput ? ui.matrixInput.value : '';
+    if (!String(matrixText || '').trim()) {
+      return false;
+    }
+
+    try {
+      const matrix = parseAdjacencyMatrixText(matrixText);
+      const labels = resolveMatrixLabelsForSize(matrix.length, matrixLabelsSeedForSize(matrix.length));
+      setGraphFromMatrix(matrix, labels);
+      return true;
+    } catch (err) {
+      return false;
+    }
+  }
+
+  function scheduleAutoApplyMatrix() {
+    if (matrixAutoApplyTimer) {
+      clearTimeout(matrixAutoApplyTimer);
+      matrixAutoApplyTimer = 0;
+    }
+    matrixAutoApplyTimer = window.setTimeout(() => {
+      matrixAutoApplyTimer = 0;
+      applyMatrixFromInputs();
+    }, 250);
+  }
+
   if (ui.addNode) {
     ui.addNode.addEventListener('click', () => {
       addNode(ui.nodeLabel ? ui.nodeLabel.value : '');
@@ -480,6 +725,20 @@
     ui.clear.addEventListener('click', clearGraph);
   }
 
+  if (ui.matrixInput) {
+    ui.matrixInput.addEventListener('input', () => {
+      renderMatrixMappingPreview();
+      scheduleAutoApplyMatrix();
+    });
+  }
+
+  if (ui.matrixLabels) {
+    ui.matrixLabels.addEventListener('input', () => {
+      renderMatrixMappingPreview();
+      scheduleAutoApplyMatrix();
+    });
+  }
+
   window.GraphEditor = {
     getAdjacencyList() {
       const out = {};
@@ -504,10 +763,16 @@
     clearStates,
     markPath,
     flashNotFound,
-    clearGraph
+    clearGraph,
+    applyAdjacencyMatrix(text, labelsText) {
+      const matrix = parseAdjacencyMatrixText(text);
+      const labels = resolveMatrixLabelsForSize(matrix.length, labelsText || matrixLabelsSeedForSize(matrix.length));
+      setGraphFromMatrix(matrix, labels);
+    }
   };
 
   window.addEventListener('resize', () => renderGraph());
   syncUI();
+  renderMatrixMappingPreview();
 })();
 

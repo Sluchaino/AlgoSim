@@ -1,29 +1,14 @@
-﻿(function () {
+(function () {
   let editor;
   const consoleEl = document.getElementById('console');
-  const statusBox = document.getElementById('run-status');
-  const statusText = document.getElementById('run-status-text');
-  const btnExportRawLogs = document.getElementById('export-raw-logs');
-  const timerEl = document.getElementById('run-timer');
-  const stageTimeEls = {};
-  const stageStepEls = {};
-  const STAGES = ['Queued', 'Compiling', 'Running', 'Completed', 'Failed', 'Cancelled'];
-  let timerId = null;
-  let timerStart = null;
-  let currentStage = null;
-  let stageStart = null;
-  const stageDurations = new Map();
-  const stageSeen = new Set();
-  let lastServerRawLogs = '';
-  let lastServerSubmissionId = null;
-  let lastServerAlgo = 'run';
-
-  document.querySelectorAll('[data-stage-time]').forEach(el => {
-    stageTimeEls[el.dataset.stageTime] = el;
-  });
-  document.querySelectorAll('[data-stage]').forEach(el => {
-    stageStepEls[el.dataset.stage] = el;
-  });
+  const statusPanel = window.RunStatusPanel || {};
+  const rawLogExport = window.RawLogExport || { bind() {}, reset() {}, remember() {} };
+  const normalizeStage = statusPanel.normalizeStage || function (stage) { return stage; };
+  const setStatus = statusPanel.setStatus || function () {};
+  const resetStageDurations = statusPanel.resetStageDurations || function () {};
+  const handleStatusStage = statusPanel.handleStatusStage || function () {};
+  const startTimer = statusPanel.startTimer || function () {};
+  const stopTimer = statusPanel.stopTimer || function () {};
 
   function log(line) {
     if (!consoleEl) return;
@@ -31,180 +16,7 @@
     consoleEl.scrollTop = consoleEl.scrollHeight;
   }
 
-  function setRawExportEnabled(enabled) {
-    if (!btnExportRawLogs) return;
-    btnExportRawLogs.disabled = !enabled;
-  }
-
-  function resetRawExportState() {
-    lastServerRawLogs = '';
-    lastServerSubmissionId = null;
-    lastServerAlgo = getAlgoKey();
-    setRawExportEnabled(false);
-  }
-
-  function rememberRawServerLogs(rawOutput, submissionId, algoKey) {
-    if (typeof rawOutput !== 'string' || rawOutput.length === 0) {
-      resetRawExportState();
-      return;
-    }
-    lastServerRawLogs = rawOutput;
-    lastServerSubmissionId = submissionId || null;
-    lastServerAlgo = (algoKey || getAlgoKey() || 'run').toLowerCase();
-    setRawExportEnabled(true);
-  }
-
-  function downloadTextFile(filename, text) {
-    const blob = new Blob([text], { type: 'text/plain;charset=utf-8' });
-    const url = URL.createObjectURL(blob);
-    const a = document.createElement('a');
-    a.href = url;
-    a.download = filename;
-    document.body.appendChild(a);
-    a.click();
-    a.remove();
-    URL.revokeObjectURL(url);
-  }
-
-  function sanitizeFilePart(text) {
-    return String(text || '')
-      .trim()
-      .replace(/[^a-z0-9_-]+/gi, '-')
-      .replace(/-+/g, '-')
-      .replace(/^-|-$/g, '') || 'run';
-  }
-
-  function setStatus(text) {
-    if (statusText) statusText.textContent = text || 'Idle';
-    if (statusBox) statusBox.dataset.state = text || 'Idle';
-  }
-
-  function normalizeStage(stage) {
-    const raw = String(stage || '').trim();
-    const lower = raw.toLowerCase();
-    if (lower === 'queued') return 'Queued';
-    if (lower === 'compiling') return 'Compiling';
-    if (lower === 'running') return 'Running';
-    if (lower === 'completed') return 'Completed';
-    if (lower === 'failed') return 'Failed';
-    if (lower === 'cancelled') return 'Cancelled';
-    return raw;
-  }
-
-  function formatStageMs(ms) {
-    const secs = Math.max(0, Math.round(ms / 1000));
-    return `${secs} сек`;
-  }
-
-  function renderStageDurations() {
-    const now = Date.now();
-    STAGES.forEach(stage => {
-      let ms = stageDurations.get(stage) || 0;
-      if (currentStage === stage && stageStart) {
-        ms += now - stageStart;
-      }
-      if (stageTimeEls[stage]) stageTimeEls[stage].textContent = formatStageMs(ms);
-    });
-  }
-
-  function resetStageDurations() {
-    STAGES.forEach(stage => stageDurations.set(stage, 0));
-    currentStage = null;
-    stageStart = null;
-    Object.values(stageStepEls).forEach(el => el.classList.remove('is-active'));
-    Object.values(stageStepEls).forEach(el => el.classList.add('is-hidden'));
-    stageSeen.clear();
-    renderStageDurations();
-  }
-
-  function setActiveStage(stage) {
-    Object.values(stageStepEls).forEach(el => el.classList.remove('is-active'));
-    const el = stageStepEls[stage];
-    if (el) el.classList.add('is-active');
-  }
-
-  function showStage(stage) {
-    const el = stageStepEls[stage];
-    if (!el) return;
-    el.classList.remove('is-hidden');
-    stageSeen.add(stage);
-  }
-
-  function enterStage(stage) {
-    const s = normalizeStage(stage);
-    if (!STAGES.includes(s)) return;
-    showStage(s);
-    const now = Date.now();
-    if (currentStage && stageStart) {
-      const prev = stageDurations.get(currentStage) || 0;
-      stageDurations.set(currentStage, prev + (now - stageStart));
-    }
-    currentStage = s;
-    stageStart = now;
-    setActiveStage(s);
-    renderStageDurations();
-  }
-
-  function finalizeStages(finalStage) {
-    const now = Date.now();
-    if (currentStage && stageStart) {
-      const prev = stageDurations.get(currentStage) || 0;
-      stageDurations.set(currentStage, prev + (now - stageStart));
-    }
-    currentStage = null;
-    stageStart = null;
-    const s = normalizeStage(finalStage);
-    if (STAGES.includes(s)) {
-      showStage(s);
-      setActiveStage(s);
-    }
-    STAGES.forEach(stage => {
-      if (!stageSeen.has(stage)) {
-        showStage(stage);
-      }
-    });
-    renderStageDurations();
-  }
-
-  function handleStatusStage(state) {
-    const s = normalizeStage(state);
-    if (!STAGES.includes(s)) return;
-    if (s === 'Completed' || s === 'Failed' || s === 'Cancelled') {
-      finalizeStages(s);
-      return;
-    }
-    if (currentStage !== s) enterStage(s);
-  }
-
-  function formatElapsed(ms) {
-    const total = Math.max(0, Math.floor(ms / 1000));
-    const h = Math.floor(total / 3600);
-    const m = Math.floor((total % 3600) / 60);
-    const s = total % 60;
-    if (h > 0) {
-      return `${String(h).padStart(2, '0')}:${String(m).padStart(2, '0')}:${String(s).padStart(2, '0')}`;
-    }
-    return `${String(m).padStart(2, '0')}:${String(s).padStart(2, '0')}`;
-  }
-
-  function startTimer() {
-    timerStart = Date.now();
-    if (timerEl) timerEl.textContent = '00:00';
-    if (timerId) clearInterval(timerId);
-    timerId = setInterval(() => {
-      if (!timerStart) return;
-      const elapsed = Date.now() - timerStart;
-      if (timerEl) timerEl.textContent = formatElapsed(elapsed);
-      renderStageDurations();
-    }, 200);
-  }
-
-  function stopTimer() {
-    if (timerId) {
-      clearInterval(timerId);
-      timerId = null;
-    }
-  }
+  rawLogExport.bind(log);
 
   // ---------- Monaco ----------
   window.__monacoReady = window.__monacoReady || new Promise((resolve) => {
@@ -605,6 +417,7 @@ ${printLine}
   let timelineStepItems = [];
   let timelineInitialArray = [];
   let timelineAlgo = 'insertion';
+  let timelineFinalState = null;
   let timelineCursor = 0;
   let timelineUiFrozen = false;
   let stepListAutoFollow = true;
@@ -1173,6 +986,7 @@ ${printLine}
   const player = new LogPlayer((item) => processPlaybackItem(item));
 
   function finalizeTailVisualStateIfNeeded() {
+    if (timelineFinalState !== 'Completed') return;
     if (timelineAlgo === 'insertion' && window.VizScene && typeof window.VizScene.forceCompleteAllInsertions === 'function') {
       window.VizScene.forceCompleteAllInsertions();
     }
@@ -1229,6 +1043,7 @@ ${printLine}
     timelineStepItems = [];
     timelineInitialArray = [];
     timelineAlgo = getAlgoKey();
+    timelineFinalState = null;
     timelineCursor = 0;
     setStepListAutoFollow(true);
     player.stop();
@@ -1237,10 +1052,11 @@ ${printLine}
     refreshStepCursorUi();
   }
 
-  function loadTimeline(stepPayloads, initialArray, algoName) {
+  function loadTimeline(stepPayloads, initialArray, algoName, finalState) {
     timelineStepItems = (stepPayloads || []).map(p => ({ type: 'step', payload: p }));
     timelineInitialArray = Array.isArray(initialArray) ? initialArray.slice() : [];
     timelineAlgo = algoName || getAlgoKey();
+    timelineFinalState = normalizeStage(finalState);
     timelineCursor = 0;
     setStepListAutoFollow(true);
     renderStepTimeline();
@@ -1370,19 +1186,6 @@ ${printLine}
 
   let currentRunToken = null;
   const runnerBase = (window.RUNNER_BASE || '').replace(/\/+$/, '');
-
-  btnExportRawLogs && btnExportRawLogs.addEventListener('click', () => {
-    if (!lastServerRawLogs) {
-      log('[error] Нет raw логов для экспорта. Сначала выполните запуск.');
-      return;
-    }
-    const ts = new Date().toISOString().replace(/[:.]/g, '-');
-    const algo = sanitizeFilePart(lastServerAlgo);
-    const submission = lastServerSubmissionId ? `submission-${sanitizeFilePart(lastServerSubmissionId)}` : 'submission';
-    const fileName = `raw-logs-${algo}-${submission}-${ts}.log`;
-    downloadTextFile(fileName, lastServerRawLogs);
-    log(`[raw logs] exported: ${fileName}`);
-  });
 
   function buildInputPayload(algo) {
     const key = algo || getAlgoKey();
@@ -1629,7 +1432,7 @@ ${printLine}
 
     if (consoleEl) consoleEl.textContent = '';
     clearTimeline();
-    resetRawExportState();
+    rawLogExport.reset(algoName);
 
     try {
       const submitUrl = `${runnerBase}/api/submissions`;
@@ -1675,7 +1478,7 @@ ${printLine}
       }
 
       const result = await resultRes.json();
-      rememberRawServerLogs(result && typeof result.output === 'string' ? result.output : '', id, algoName);
+      rawLogExport.remember(result && typeof result.output === 'string' ? result.output : '', id, algoName);
       if (result && result.error) {
         log('[stderr] ' + result.error);
       }
@@ -1688,7 +1491,7 @@ ${printLine}
         return;
       }
 
-      loadTimeline(stepPayloads, pageArray, algoName);
+      loadTimeline(stepPayloads, pageArray, algoName, finalStatus ? finalStatus.state : null);
 
       const auto = chkAutoplay ? !!chkAutoplay.checked : true;
       if (auto && stepPayloads.length) {
@@ -1703,7 +1506,7 @@ ${printLine}
     }
   });
 
-  resetRawExportState();
+  rawLogExport.reset(getAlgoKey());
   clearTimeline();
   setStatus('Idle');
 })();

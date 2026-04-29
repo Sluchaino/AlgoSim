@@ -65,10 +65,8 @@ namespace AlgoPlatform.Tests.Integration
                 {
                     db.Algorithms.AddRange(new[]
                     {
-                        new Algorithm { Id = 1, Name = "Bubble sort", Description = "Seed" },
                         new Algorithm { Id = 2, Name = "Selection sort", Description = "Seed" },
                         new Algorithm { Id = 3, Name = "Insertion sort", Description = "Seed" },
-                        new Algorithm { Id = 4, Name = "Merge sort", Description = "Seed" },
                         new Algorithm { Id = 5, Name = "Quick sort", Description = "Seed" },
                         new Algorithm { Id = 6, Name = "DFS", Description = "Seed" },
                         new Algorithm { Id = 7, Name = "BFS", Description = "Seed" }

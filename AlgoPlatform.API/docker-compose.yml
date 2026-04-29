@@ -2,9 +2,9 @@ services:
   postgres:
     image: postgres:16-alpine
     environment:
-      POSTGRES_USER: algoplatform
-      POSTGRES_PASSWORD: 777buba777
-      POSTGRES_DB: AlgoPlatform
+      POSTGRES_USER: ${POSTGRES_USER:?Set POSTGRES_USER in .env}
+      POSTGRES_PASSWORD: ${POSTGRES_PASSWORD:?Set POSTGRES_PASSWORD in .env}
+      POSTGRES_DB: ${POSTGRES_DB:?Set POSTGRES_DB in .env}
     ports:
       - "5432:5432"
     volumes:
@@ -17,7 +17,7 @@ services:
 
   redis:
     image: redis:7-alpine
-    command: ["redis-server", "--appendonly", "yes", "--requirepass", "devpass"]
+    command: ["sh", "-c", "redis-server --appendonly yes --requirepass \"${REDIS_PASSWORD:?Set REDIS_PASSWORD in .env}\""]
     ports:
       - "6379:6379"
     volumes:
@@ -25,13 +25,13 @@ services:
 
   rabbitmq:
     image: rabbitmq:3.13-management-alpine
-    ports:
-      - "5672:5672"     # AMQP
-      - "15672:15672"   # веб-UI http://localhost:15672
     environment:
-      RABBITMQ_DEFAULT_USER: algo
-      RABBITMQ_DEFAULT_PASS: algopass
-      RABBITMQ_DEFAULT_VHOST: /
+      RABBITMQ_DEFAULT_USER: ${RABBITMQ_DEFAULT_USER:?Set RABBITMQ_DEFAULT_USER in .env}
+      RABBITMQ_DEFAULT_PASS: ${RABBITMQ_DEFAULT_PASS:?Set RABBITMQ_DEFAULT_PASS in .env}
+      RABBITMQ_DEFAULT_VHOST: ${RABBITMQ_DEFAULT_VHOST:-/}
+    ports:
+      - "5672:5672"
+      - "15672:15672"
     healthcheck:
       test: ["CMD-SHELL", "rabbitmq-diagnostics -q ping"]
       interval: 5s
@@ -42,18 +42,13 @@ services:
     image: minio/minio
     command: server /data --console-address ":9001"
     environment:
-      MINIO_ROOT_USER: minio
-      MINIO_ROOT_PASSWORD: minio123
-      MINIO_ROOT_USER_FILE: /run/secrets/access_key
-      MINIO_ROOT_PASSWORD_FILE: /run/secrets/secret_key
-      MINIO_ACCESS_KEY_FILE: /run/secrets/access_key
-      MINIO_SECRET_KEY_FILE: /run/secrets/secret_key
+      MINIO_ROOT_USER: ${MINIO_ROOT_USER:?Set MINIO_ROOT_USER in .env}
+      MINIO_ROOT_PASSWORD: ${MINIO_ROOT_PASSWORD:?Set MINIO_ROOT_PASSWORD in .env}
     ports:
       - "9000:9000"
       - "9001:9001"
     volumes:
       - miniodata:/data
-      - ./minio-secrets:/run/secrets:ro
 
   minio-init:
     image: minio/mc
@@ -61,38 +56,39 @@ services:
       - minio
     entrypoint: ["/bin/sh", "-lc"]
     command: >
-      "until mc alias set local http://minio:9000 minio minio123; do
+      "until mc alias set local http://minio:9000 ${MINIO_ROOT_USER:?Set MINIO_ROOT_USER in .env} ${MINIO_ROOT_PASSWORD:?Set MINIO_ROOT_PASSWORD in .env}; do
          echo 'waiting for minio...'; sleep 2;
        done &&
-       mc mb -p local/algosim-artifacts || true &&
-       mc anonymous set none local/algosim-artifacts || true"
-  
+       mc mb -p local/${S3__Bucket:?Set S3__Bucket in .env} || true &&
+       mc anonymous set none local/${S3__Bucket:?Set S3__Bucket in .env} || true"
+
   runner:
     build:
       context: .
       dockerfile: ./Dockerfile.runner
     environment:
       ASPNETCORE_URLS: http://0.0.0.0:5291
-      Runner__HeartbeatIntervalSeconds: 2
-      AWS_ACCESS_KEY_ID: minio
-      AWS_SECRET_ACCESS_KEY: minio123
-      AWS_EC2_METADATA_DISABLED: "true"
-      RabbitMQ__Host: rabbitmq
-      RabbitMQ__User: algo
-      RabbitMQ__Pass: algopass
-      RabbitMQ__VHost: /
-      RabbitMQ__RunQueue: runs
-      RabbitMQ__CancelQueue: run-cancel
-      RabbitMQ__ResultQueue: run-results
-      RabbitMQ__HeartbeatQueue: run-heartbeats
-      RabbitMQ__RetryDelaySeconds: 5
-      RabbitMQ__MaxRetries: 3
-      S3__Endpoint: http://minio:9000
-      S3__Bucket: algosim-artifacts
-      S3__AccessKey: minio
-      S3__SecretKey: minio123
-      S3__UsePathStyle: true
-      S3__UseSignatureVersion4: true
+      Runner__ContainerRuntime: ${Runner__ContainerRuntime:-runsc}
+      Runner__HeartbeatIntervalSeconds: ${Runner__HeartbeatIntervalSeconds:-2}
+      AWS_ACCESS_KEY_ID: ${AWS_ACCESS_KEY_ID:?Set AWS_ACCESS_KEY_ID in .env}
+      AWS_SECRET_ACCESS_KEY: ${AWS_SECRET_ACCESS_KEY:?Set AWS_SECRET_ACCESS_KEY in .env}
+      AWS_EC2_METADATA_DISABLED: ${AWS_EC2_METADATA_DISABLED:-true}
+      RabbitMQ__Host: ${RabbitMQ__Host:-rabbitmq}
+      RabbitMQ__User: ${RabbitMQ__User:?Set RabbitMQ__User in .env}
+      RabbitMQ__Pass: ${RabbitMQ__Pass:?Set RabbitMQ__Pass in .env}
+      RabbitMQ__VHost: ${RabbitMQ__VHost:-/}
+      RabbitMQ__RunQueue: ${RabbitMQ__RunQueue:-runs}
+      RabbitMQ__CancelQueue: ${RabbitMQ__CancelQueue:-run-cancel}
+      RabbitMQ__ResultQueue: ${RabbitMQ__ResultQueue:-run-results}
+      RabbitMQ__HeartbeatQueue: ${RabbitMQ__HeartbeatQueue:-run-heartbeats}
+      RabbitMQ__RetryDelaySeconds: ${RabbitMQ__RetryDelaySeconds:-5}
+      RabbitMQ__MaxRetries: ${RabbitMQ__MaxRetries:-3}
+      S3__Endpoint: ${S3__Endpoint:-http://minio:9000}
+      S3__Bucket: ${S3__Bucket:?Set S3__Bucket in .env}
+      S3__AccessKey: ${S3__AccessKey:?Set S3__AccessKey in .env}
+      S3__SecretKey: ${S3__SecretKey:?Set S3__SecretKey in .env}
+      S3__UsePathStyle: ${S3__UsePathStyle:-true}
+      S3__UseSignatureVersion4: ${S3__UseSignatureVersion4:-true}
     ports:
       - "5291:5291"
     volumes:
@@ -100,30 +96,34 @@ services:
     depends_on:
       rabbitmq:
         condition: service_healthy
+      minio:
+        condition: service_started
 
   compiler:
     build:
       context: .
       dockerfile: ./Dockerfile.compiler
     environment:
-      Compiler__TimeoutSeconds: 180
-      AWS_ACCESS_KEY_ID: minio
-      AWS_SECRET_ACCESS_KEY: minio123
-      AWS_EC2_METADATA_DISABLED: "true"
-      RabbitMQ__Host: rabbitmq
-      RabbitMQ__User: algo
-      RabbitMQ__Pass: algopass
-      RabbitMQ__VHost: /
-      RabbitMQ__CompileQueue: compile
-      RabbitMQ__CompileResultQueue: compile-results
-      RabbitMQ__RetryDelaySeconds: 5
-      RabbitMQ__MaxRetries: 3
-      S3__Endpoint: http://minio:9000
-      S3__Bucket: algosim-artifacts
-      S3__AccessKey: minio
-      S3__SecretKey: minio123
-      S3__UsePathStyle: true
-      S3__UseSignatureVersion4: true
+      Compiler__ContainerRuntime: ${Compiler__ContainerRuntime:-runsc}
+      Compiler__TimeoutSeconds: ${Compiler__TimeoutSeconds:-180}
+      AWS_ACCESS_KEY_ID: ${AWS_ACCESS_KEY_ID:?Set AWS_ACCESS_KEY_ID in .env}
+      AWS_SECRET_ACCESS_KEY: ${AWS_SECRET_ACCESS_KEY:?Set AWS_SECRET_ACCESS_KEY in .env}
+      AWS_EC2_METADATA_DISABLED: ${AWS_EC2_METADATA_DISABLED:-true}
+      RabbitMQ__Host: ${RabbitMQ__Host:-rabbitmq}
+      RabbitMQ__User: ${RabbitMQ__User:?Set RabbitMQ__User in .env}
+      RabbitMQ__Pass: ${RabbitMQ__Pass:?Set RabbitMQ__Pass in .env}
+      RabbitMQ__VHost: ${RabbitMQ__VHost:-/}
+      RabbitMQ__CompileQueue: ${RabbitMQ__CompileQueue:-compile}
+      RabbitMQ__CompileResultQueue: ${RabbitMQ__CompileResultQueue:-compile-results}
+      RabbitMQ__HeartbeatQueue: ${RabbitMQ__HeartbeatQueue:-run-heartbeats}
+      RabbitMQ__RetryDelaySeconds: ${RabbitMQ__RetryDelaySeconds:-5}
+      RabbitMQ__MaxRetries: ${RabbitMQ__MaxRetries:-3}
+      S3__Endpoint: ${S3__Endpoint:-http://minio:9000}
+      S3__Bucket: ${S3__Bucket:?Set S3__Bucket in .env}
+      S3__AccessKey: ${S3__AccessKey:?Set S3__AccessKey in .env}
+      S3__SecretKey: ${S3__SecretKey:?Set S3__SecretKey in .env}
+      S3__UsePathStyle: ${S3__UsePathStyle:-true}
+      S3__UseSignatureVersion4: ${S3__UseSignatureVersion4:-true}
     volumes:
       - /var/run/docker.sock:/var/run/docker.sock
     depends_on:
@@ -135,24 +135,31 @@ services:
   api:
     build:
       context: .
-      dockerfile: ./Dockerfile   # Dockerfile у тебя в корне решения
+      dockerfile: ./Dockerfile
     environment:
-      ASPNETCORE_ENVIRONMENT: Development
+      ASPNETCORE_ENVIRONMENT: ${ASPNETCORE_ENVIRONMENT:-Development}
       ASPNETCORE_URLS: http://0.0.0.0:5280
-      ConnectionStrings__DefaultConnection: Host=postgres;Username=algoplatform;Password=777buba777;Database=AlgoPlatform
-      Redis__Connection: redis:6379,password=devpass,abortConnect=false
-      RabbitMQ__Host: rabbitmq
-      RabbitMQ__User: algo
-      RabbitMQ__Pass: algopass
-      RabbitMQ__Queue: submissions
-      RabbitMQ__CancelQueue: run-cancel
-      RabbitMQ__HeartbeatQueue: run-heartbeats
-      S3__Endpoint: http://minio:9000
-      S3__Bucket: algosim-artifacts
-      S3__AccessKey: minio
-      S3__SecretKey: minio123
-      S3__UsePathStyle: true
-      S3__UseSignatureVersion4: true
+      ConnectionStrings__DefaultConnection: ${ConnectionStrings__DefaultConnection:?Set ConnectionStrings__DefaultConnection in .env}
+      Redis__Connection: ${Redis__Connection:?Set Redis__Connection in .env}
+      RabbitMQ__Host: ${RabbitMQ__Host:-rabbitmq}
+      RabbitMQ__User: ${RabbitMQ__User:?Set RabbitMQ__User in .env}
+      RabbitMQ__Pass: ${RabbitMQ__Pass:?Set RabbitMQ__Pass in .env}
+      RabbitMQ__VHost: ${RabbitMQ__VHost:-/}
+      RabbitMQ__Queue: ${RabbitMQ__Queue:-submissions}
+      RabbitMQ__RunQueue: ${RabbitMQ__RunQueue:-runs}
+      RabbitMQ__CancelQueue: ${RabbitMQ__CancelQueue:-run-cancel}
+      RabbitMQ__ResultQueue: ${RabbitMQ__ResultQueue:-run-results}
+      RabbitMQ__HeartbeatQueue: ${RabbitMQ__HeartbeatQueue:-run-heartbeats}
+      RabbitMQ__CompileQueue: ${RabbitMQ__CompileQueue:-compile}
+      RabbitMQ__CompileResultQueue: ${RabbitMQ__CompileResultQueue:-compile-results}
+      RabbitMQ__RetryDelaySeconds: ${RabbitMQ__RetryDelaySeconds:-5}
+      RabbitMQ__MaxRetries: ${RabbitMQ__MaxRetries:-3}
+      S3__Endpoint: ${S3__Endpoint:-http://minio:9000}
+      S3__Bucket: ${S3__Bucket:?Set S3__Bucket in .env}
+      S3__AccessKey: ${S3__AccessKey:?Set S3__AccessKey in .env}
+      S3__SecretKey: ${S3__SecretKey:?Set S3__SecretKey in .env}
+      S3__UsePathStyle: ${S3__UsePathStyle:-true}
+      S3__UseSignatureVersion4: ${S3__UseSignatureVersion4:-true}
     ports:
       - "5280:5280"
     depends_on:
@@ -162,32 +169,35 @@ services:
         condition: service_started
       rabbitmq:
         condition: service_healthy
+      minio:
+        condition: service_started
 
   worker:
     build:
       context: .
       dockerfile: ./Dockerfile.worker
     environment:
-      ConnectionStrings__DefaultConnection: Host=postgres;Username=algoplatform;Password=777buba777;Database=AlgoPlatform
-      Redis__Connection: redis:6379,password=devpass,abortConnect=false
-      RabbitMQ__Host: rabbitmq
-      RabbitMQ__User: algo
-      RabbitMQ__Pass: algopass
-      RabbitMQ__Queue: submissions
-      RabbitMQ__RunQueue: runs
-      RabbitMQ__CancelQueue: run-cancel
-      RabbitMQ__ResultQueue: run-results
-      RabbitMQ__HeartbeatQueue: run-heartbeats
-      RabbitMQ__CompileQueue: compile
-      RabbitMQ__CompileResultQueue: compile-results
-      RabbitMQ__RetryDelaySeconds: 5
-      RabbitMQ__MaxRetries: 3
-      S3__Endpoint: http://minio:9000
-      S3__Bucket: algosim-artifacts
-      S3__AccessKey: minio
-      S3__SecretKey: minio123
-      S3__UsePathStyle: true
-      S3__UseSignatureVersion4: true
+      ConnectionStrings__DefaultConnection: ${ConnectionStrings__DefaultConnection:?Set ConnectionStrings__DefaultConnection in .env}
+      Redis__Connection: ${Redis__Connection:?Set Redis__Connection in .env}
+      RabbitMQ__Host: ${RabbitMQ__Host:-rabbitmq}
+      RabbitMQ__User: ${RabbitMQ__User:?Set RabbitMQ__User in .env}
+      RabbitMQ__Pass: ${RabbitMQ__Pass:?Set RabbitMQ__Pass in .env}
+      RabbitMQ__VHost: ${RabbitMQ__VHost:-/}
+      RabbitMQ__Queue: ${RabbitMQ__Queue:-submissions}
+      RabbitMQ__RunQueue: ${RabbitMQ__RunQueue:-runs}
+      RabbitMQ__CancelQueue: ${RabbitMQ__CancelQueue:-run-cancel}
+      RabbitMQ__ResultQueue: ${RabbitMQ__ResultQueue:-run-results}
+      RabbitMQ__HeartbeatQueue: ${RabbitMQ__HeartbeatQueue:-run-heartbeats}
+      RabbitMQ__CompileQueue: ${RabbitMQ__CompileQueue:-compile}
+      RabbitMQ__CompileResultQueue: ${RabbitMQ__CompileResultQueue:-compile-results}
+      RabbitMQ__RetryDelaySeconds: ${RabbitMQ__RetryDelaySeconds:-5}
+      RabbitMQ__MaxRetries: ${RabbitMQ__MaxRetries:-3}
+      S3__Endpoint: ${S3__Endpoint:-http://minio:9000}
+      S3__Bucket: ${S3__Bucket:?Set S3__Bucket in .env}
+      S3__AccessKey: ${S3__AccessKey:?Set S3__AccessKey in .env}
+      S3__SecretKey: ${S3__SecretKey:?Set S3__SecretKey in .env}
+      S3__UsePathStyle: ${S3__UsePathStyle:-true}
+      S3__UseSignatureVersion4: ${S3__UseSignatureVersion4:-true}
     depends_on:
       postgres:
         condition: service_healthy
@@ -195,6 +205,8 @@ services:
         condition: service_started
       rabbitmq:
         condition: service_healthy
+      minio:
+        condition: service_started
 
 volumes:
   pgdata:

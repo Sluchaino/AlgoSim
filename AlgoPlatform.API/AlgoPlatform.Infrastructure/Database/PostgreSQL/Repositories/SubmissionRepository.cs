@@ -32,7 +32,9 @@ namespace AlgoPlatform.Infrastructure.Database.PostgreSQL.Repositories
         public async Task<SubmissionMetrics> GetMetricsAsync(CancellationToken ct)
         {
             var total = await _db.Submissions.CountAsync(ct);
-            var queued = await _db.Submissions.CountAsync(x => x.Status == "Queued", ct);
+            var queued = await _db.Submissions.CountAsync(
+                x => x.Status == "Queued" || x.Status == "CompileQueued" || x.Status == "Compiling" || x.Status == "RunQueued",
+                ct);
             var running = await _db.Submissions.CountAsync(x => x.Status == "Running", ct);
             var completed = await _db.Submissions.CountAsync(x => x.Status == "Completed", ct);
             var failed = await _db.Submissions.CountAsync(x => x.Status == "Failed", ct);

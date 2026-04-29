@@ -9,13 +9,8 @@ using System.Diagnostics;
 var builder = Host.CreateApplicationBuilder(args);
 
 var options = builder.Configuration.GetSection("Compiler").Get<CompilerOptions>() ?? new CompilerOptions();
-var requestedRuntime = options.ContainerRuntime;
-var runtimeFallback = false;
-if (!string.IsNullOrWhiteSpace(requestedRuntime) && !DockerRuntimeExists(requestedRuntime))
-{
-    options.ContainerRuntime = string.Empty;
-    runtimeFallback = true;
-}
+options.ContainerRuntime = "runsc";
+RequireDockerRuntime(options.ContainerRuntime, "Compiler");
 builder.Services.AddSingleton(options);
 builder.Services.AddSingleton<DockerCliCodeCompiler>();
 
@@ -63,14 +58,7 @@ builder.Services.AddHostedService<RabbitMqCompileWorker>();
 var host = builder.Build();
 
 var startupLogger = host.Services.GetRequiredService<ILogger<Program>>();
-var startupRuntime = string.IsNullOrWhiteSpace(options.ContainerRuntime) ? "default" : options.ContainerRuntime;
-startupLogger.LogInformation("Compiler starting. Container runtime: {Runtime}", startupRuntime);
-if (runtimeFallback)
-{
-    startupLogger.LogWarning(
-        "Requested runtime '{Runtime}' is unavailable. Fallback to default runtime is active.",
-        requestedRuntime);
-}
+startupLogger.LogInformation("Compiler starting. Required container runtime: {Runtime}", options.ContainerRuntime);
 startupLogger.LogInformation(
     "S3 config: endpoint={Endpoint}, accessKey={AccessKey}, usePathStyle={UsePathStyle}",
     builder.Configuration["S3:Endpoint"],
@@ -78,6 +66,15 @@ startupLogger.LogInformation(
     builder.Configuration["S3:UsePathStyle"]);
 
 host.Run();
+
+static void RequireDockerRuntime(string runtimeName, string serviceName)
+{
+    if (!DockerRuntimeExists(runtimeName))
+    {
+        throw new InvalidOperationException(
+            $"{serviceName} requires Docker runtime '{runtimeName}'. Configure gVisor/runsc in Docker before starting the service.");
+    }
+}
 
 static bool DockerRuntimeExists(string runtimeName)
 {

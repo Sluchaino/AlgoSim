@@ -1,4 +1,4 @@
-using AlgoPlatform.Domain.Models;
+п»їusing AlgoPlatform.Domain.Models;
 using Microsoft.EntityFrameworkCore;
 
 namespace AlgoPlatform.Infrastructure.Database.PostgreSQL
@@ -10,7 +10,6 @@ namespace AlgoPlatform.Infrastructure.Database.PostgreSQL
         {
         }
 
-        // лучше сразу инициализировать, чтобы не ругался на null
         public DbSet<Algorithm> Algorithms { get; set; } = null!;
         public DbSet<Submission> Submissions { get; set; } = null!;
         public DbSet<Artifact> Artifacts { get; set; } = null!;
@@ -27,7 +26,7 @@ namespace AlgoPlatform.Infrastructure.Database.PostgreSQL
 
                 entity.Property(a => a.Id)
                       .HasColumnName("id")
-                      .ValueGeneratedOnAdd(); // автоинкремент
+                      .ValueGeneratedOnAdd();
 
                 entity.Property(a => a.Name)
                       .HasColumnName("name")
@@ -38,15 +37,12 @@ namespace AlgoPlatform.Infrastructure.Database.PostgreSQL
                       .HasColumnName("description")
                       .HasMaxLength(2000);
 
-                // сидинг 7 алгоритмов
                 entity.HasData(
-                    new Algorithm { Id = 1, Name = "Bubble sort", Description = "Простой сортировочный алгоритм O(n^2)." },
-                    new Algorithm { Id = 2, Name = "Selection sort", Description = "Сортировка выбором, O(n^2)." },
-                    new Algorithm { Id = 3, Name = "Insertion sort", Description = "Сортировка вставками, O(n^2)." },
-                    new Algorithm { Id = 4, Name = "Merge sort", Description = "Сортировка слиянием, O(n log n)." },
-                    new Algorithm { Id = 5, Name = "Quick sort", Description = "Быстрая сортировка, O(n log n) в среднем." },
-                    new Algorithm { Id = 6, Name = "DFS", Description = "Поиск в глубину в графе." },
-                    new Algorithm { Id = 7, Name = "BFS", Description = "Поиск в ширину в графе." }
+                    new Algorithm { Id = 2, Name = "Selection sort", Description = "РЎРѕСЂС‚РёСЂРѕРІРєР° РІС‹Р±РѕСЂРѕРј, O(n^2)." },
+                    new Algorithm { Id = 3, Name = "Insertion sort", Description = "РЎРѕСЂС‚РёСЂРѕРІРєР° РІСЃС‚Р°РІРєР°РјРё, O(n^2)." },
+                    new Algorithm { Id = 5, Name = "Quick sort", Description = "Р‘С‹СЃС‚СЂР°СЏ СЃРѕСЂС‚РёСЂРѕРІРєР°, O(n log n) РІ СЃСЂРµРґРЅРµРј." },
+                    new Algorithm { Id = 6, Name = "DFS", Description = "РџРѕРёСЃРє РІ РіР»СѓР±РёРЅСѓ РІ РіСЂР°С„Рµ." },
+                    new Algorithm { Id = 7, Name = "BFS", Description = "РџРѕРёСЃРє РІ С€РёСЂРёРЅСѓ РІ РіСЂР°С„Рµ." }
                 );
             });
 

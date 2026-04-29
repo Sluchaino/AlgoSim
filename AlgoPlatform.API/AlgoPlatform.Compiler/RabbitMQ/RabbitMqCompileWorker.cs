@@ -15,12 +15,14 @@ namespace AlgoPlatform.Compiler.RabbitMQ
     public sealed class RabbitMqCompileWorker : BackgroundService
     {
         private readonly IChannel _channel;
+        private readonly IChannel _heartbeatChannel;
         private readonly DockerCliCodeCompiler _compiler;
         private readonly S3ArtifactStorage _storage;
         private readonly string _compileQueue;
         private readonly string _compileRetryQueue;
         private readonly string _compileDeadQueue;
         private readonly string _resultQueue;
+        private readonly string _heartbeatQueue;
         private readonly int _maxRetries;
         private readonly ILogger<RabbitMqCompileWorker> _logger;
 
@@ -32,6 +34,7 @@ namespace AlgoPlatform.Compiler.RabbitMQ
             ILogger<RabbitMqCompileWorker> logger)
         {
             _channel = connection.CreateChannelAsync().GetAwaiter().GetResult();
+            _heartbeatChannel = connection.CreateChannelAsync().GetAwaiter().GetResult();
             _compiler = compiler;
             _storage = storage;
             _logger = logger;
@@ -39,12 +42,20 @@ namespace AlgoPlatform.Compiler.RabbitMQ
             _compileRetryQueue = _compileQueue + ".retry";
             _compileDeadQueue = _compileQueue + ".dead";
             _resultQueue = configuration["RabbitMQ:CompileResultQueue"] ?? "compile-results";
+            _heartbeatQueue = configuration["RabbitMQ:HeartbeatQueue"] ?? "run-heartbeats";
             _maxRetries = configuration.GetValue<int?>("RabbitMQ:MaxRetries") ?? 3;
 
             var retryDelaySeconds = configuration.GetValue<int?>("RabbitMQ:RetryDelaySeconds") ?? 5;
 
             DeclareQueueWithRetry(_channel, _compileQueue, retryDelaySeconds);
             DeclareQueueWithRetry(_channel, _resultQueue, retryDelaySeconds);
+            _heartbeatChannel.QueueDeclareAsync(
+                queue: _heartbeatQueue,
+                durable: true,
+                exclusive: false,
+                autoDelete: false,
+                arguments: null
+            ).GetAwaiter().GetResult();
         }
 
         protected override async Task ExecuteAsync(CancellationToken stoppingToken)
@@ -85,6 +96,8 @@ namespace AlgoPlatform.Compiler.RabbitMQ
                     await _channel.BasicAckAsync(ea.DeliveryTag, multiple: false);
                     return;
                 }
+
+                await PublishCompilingHeartbeatAsync(job.SubmissionId);
 
                 var (success, artifact, error, durationMs) =
                     await _compiler.CompileAsync(job.Code, CancellationToken.None);
@@ -172,6 +185,31 @@ namespace AlgoPlatform.Compiler.RabbitMQ
                 }
 
                 await _channel.BasicAckAsync(ea.DeliveryTag, multiple: false);
+            }
+        }
+
+        private async Task PublishCompilingHeartbeatAsync(Guid submissionId)
+        {
+            try
+            {
+                var heartbeat = new SubmissionHeartbeatMessage(
+                    submissionId,
+                    "Compiling",
+                    0,
+                    "Compiling");
+                var body = JsonSerializer.SerializeToUtf8Bytes(heartbeat);
+                var props = new BasicProperties { Persistent = false };
+
+                await _heartbeatChannel.BasicPublishAsync(
+                    exchange: "",
+                    routingKey: _heartbeatQueue,
+                    mandatory: false,
+                    basicProperties: props,
+                    body: body);
+            }
+            catch (Exception ex)
+            {
+                _logger.LogWarning(ex, "Failed to publish compile heartbeat for {SubmissionId}", submissionId);
             }
         }
 

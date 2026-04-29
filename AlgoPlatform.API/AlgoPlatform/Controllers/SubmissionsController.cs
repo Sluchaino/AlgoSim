@@ -1,4 +1,4 @@
-﻿using System;
+using System;
 using AlgoPlatform.Application.Abstractions;
 using AlgoPlatform.Application.Interfaces;
 using AlgoPlatform.Application.Request;
@@ -167,7 +167,9 @@ namespace AlgoPlatform.Controllers
             return key switch
             {
                 "queued" => TimeSpan.FromSeconds(_timeouts.QueuedSeconds),
+                "compilequeued" => TimeSpan.FromSeconds(_timeouts.CompileQueuedSeconds),
                 "compiling" => TimeSpan.FromSeconds(_timeouts.CompilingSeconds),
+                "runqueued" => TimeSpan.FromSeconds(_timeouts.RunQueuedSeconds),
                 "running" => TimeSpan.FromSeconds(_timeouts.RunningSeconds),
                 "retrying" => TimeSpan.FromSeconds(_timeouts.RetryingSeconds),
                 _ => TimeSpan.Zero

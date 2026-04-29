@@ -10,13 +10,8 @@ using System.Diagnostics;
 var builder = WebApplication.CreateBuilder(args);
 
 var options = builder.Configuration.GetSection("Runner").Get<RunnerOptions>() ?? new RunnerOptions();
-var requestedRuntime = options.ContainerRuntime;
-var runtimeFallback = false;
-if (!string.IsNullOrWhiteSpace(requestedRuntime) && !DockerRuntimeExists(requestedRuntime))
-{
-    options.ContainerRuntime = string.Empty;
-    runtimeFallback = true;
-}
+options.ContainerRuntime = "runsc";
+RequireDockerRuntime(options.ContainerRuntime, "Runner");
 builder.Services.AddSingleton(options);
 builder.Services.AddSingleton<DockerCliCodeRunner>();
 builder.Services.AddSingleton(new SemaphoreSlim(Math.Max(1, options.MaxConcurrent)));
@@ -65,14 +60,7 @@ builder.Services.AddHostedService<RabbitMqRunWorker>();
 var app = builder.Build();
 
 var startupLogger = app.Services.GetRequiredService<ILogger<Program>>();
-var startupRuntime = string.IsNullOrWhiteSpace(options.ContainerRuntime) ? "default" : options.ContainerRuntime;
-startupLogger.LogInformation("Runner starting. Container runtime: {Runtime}", startupRuntime);
-if (runtimeFallback)
-{
-    startupLogger.LogWarning(
-        "Requested runtime '{Runtime}' is unavailable. Fallback to default runtime is active.",
-        requestedRuntime);
-}
+startupLogger.LogInformation("Runner starting. Required container runtime: {Runtime}", options.ContainerRuntime);
 
 app.MapGet("/health", (RunnerOptions runnerOptions) =>
 {
@@ -110,6 +98,15 @@ app.MapPost("/run", async (
 });
 
 app.Run();
+
+static void RequireDockerRuntime(string runtimeName, string serviceName)
+{
+    if (!DockerRuntimeExists(runtimeName))
+    {
+        throw new InvalidOperationException(
+            $"{serviceName} requires Docker runtime '{runtimeName}'. Configure gVisor/runsc in Docker before starting the service.");
+    }
+}
 
 static bool DockerRuntimeExists(string runtimeName)
 {

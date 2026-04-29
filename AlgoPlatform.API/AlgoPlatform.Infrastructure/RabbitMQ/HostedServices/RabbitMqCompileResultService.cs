@@ -111,11 +111,19 @@ namespace AlgoPlatform.Infrastructure.RabbitMQ.HostedServices
                 var waiting = new List<Submission>();
                 waiting.AddRange(await submissionRepo.GetByArtifactHashAsync(
                     result.ArtifactHash,
+                    "CompileQueued",
+                    CancellationToken.None));
+                waiting.AddRange(await submissionRepo.GetByArtifactHashAsync(
+                    result.ArtifactHash,
                     "Compiling",
                     CancellationToken.None));
                 waiting.AddRange(await submissionRepo.GetByArtifactHashAsync(
                     result.ArtifactHash,
                     "Queued",
+                    CancellationToken.None));
+                waiting.AddRange(await submissionRepo.GetByArtifactHashAsync(
+                    result.ArtifactHash,
+                    "RunQueued",
                     CancellationToken.None));
 
                 if (success)
@@ -136,14 +144,14 @@ namespace AlgoPlatform.Infrastructure.RabbitMQ.HostedServices
                         }
 
                         submission.ArtifactHash = result.ArtifactHash;
-                        submission.Status = "Running";
+                        submission.Status = "RunQueued";
                         submission.Error = null;
 
                         await runPublisher.PublishAsync(
                             new RunJobMessage(submission.Id, null, submission.Input, result.StorageKey),
                             CancellationToken.None);
 
-                        await status.SetAsync(submission.Id, new SubmissionStatus("Running", 0));
+                        await status.SetAsync(submission.Id, new SubmissionStatus("RunQueued", 0));
                     }
                 }
                 else

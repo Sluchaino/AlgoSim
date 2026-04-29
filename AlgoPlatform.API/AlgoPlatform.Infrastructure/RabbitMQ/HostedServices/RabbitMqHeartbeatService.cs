@@ -79,7 +79,8 @@ namespace AlgoPlatform.Infrastructure.RabbitMQ.HostedServices
 
                 if (current is not null
                     && (string.Equals(current.State, "Completed", StringComparison.OrdinalIgnoreCase)
-                        || string.Equals(current.State, "Failed", StringComparison.OrdinalIgnoreCase)))
+                        || string.Equals(current.State, "Failed", StringComparison.OrdinalIgnoreCase)
+                        || string.Equals(current.State, "Cancelled", StringComparison.OrdinalIgnoreCase)))
                 {
                     await _channel.BasicAckAsync(ea.DeliveryTag, multiple: false);
                     return;
@@ -89,6 +90,21 @@ namespace AlgoPlatform.Infrastructure.RabbitMQ.HostedServices
                     msg.SubmissionId,
                     new SubmissionStatus(msg.State, msg.Progress, msg.Message));
 
+                if (IsPersistentProgressState(msg.State))
+                {
+                    var repo = scope.ServiceProvider.GetRequiredService<ISubmissionRepository>();
+                    var uow = scope.ServiceProvider.GetRequiredService<IUnitOfWork>();
+                    var submission = await repo.GetAsync(msg.SubmissionId, CancellationToken.None);
+
+                    if (submission is not null
+                        && !IsFinalState(submission.Status)
+                        && !string.Equals(submission.Status, msg.State, StringComparison.OrdinalIgnoreCase))
+                    {
+                        submission.Status = msg.State;
+                        await uow.SaveChangesAsync(CancellationToken.None);
+                    }
+                }
+
                 await _channel.BasicAckAsync(ea.DeliveryTag, multiple: false);
             }
             catch (Exception ex)
@@ -97,5 +113,14 @@ namespace AlgoPlatform.Infrastructure.RabbitMQ.HostedServices
                 await _channel.BasicAckAsync(ea.DeliveryTag, multiple: false);
             }
         }
+
+        private static bool IsPersistentProgressState(string? state) =>
+            string.Equals(state, "Compiling", StringComparison.OrdinalIgnoreCase)
+            || string.Equals(state, "Running", StringComparison.OrdinalIgnoreCase);
+
+        private static bool IsFinalState(string? state) =>
+            string.Equals(state, "Completed", StringComparison.OrdinalIgnoreCase)
+            || string.Equals(state, "Failed", StringComparison.OrdinalIgnoreCase)
+            || string.Equals(state, "Cancelled", StringComparison.OrdinalIgnoreCase);
     }
 }

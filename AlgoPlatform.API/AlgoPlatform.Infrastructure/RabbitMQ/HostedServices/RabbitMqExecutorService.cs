@@ -133,11 +133,11 @@ namespace AlgoPlatform.Infrastructure.RabbitMQ.HostedServices
 
                     await artifactRepo.AddAsync(artifact, CancellationToken.None);
 
-                    submission.Status = "Compiling";
+                    submission.Status = "CompileQueued";
                     submission.Error = null;
                     await uow.SaveChangesAsync(CancellationToken.None);
 
-                    await status.SetAsync(submissionId, new SubmissionStatus("Compiling", 0));
+                    await status.SetAsync(submissionId, new SubmissionStatus("CompileQueued", 0));
 
                     await compilePublisher.PublishAsync(
                         new CompileJobMessage(submission.Id, submission.Code, hash),
@@ -151,11 +151,11 @@ namespace AlgoPlatform.Infrastructure.RabbitMQ.HostedServices
                     }
                     if (!string.IsNullOrWhiteSpace(artifact.StorageKey))
                     {
-                        submission.Status = "Running";
+                        submission.Status = "RunQueued";
                         submission.Error = null;
                         await uow.SaveChangesAsync(CancellationToken.None);
 
-                        await status.SetAsync(submissionId, new SubmissionStatus("Running", 0));
+                        await status.SetAsync(submissionId, new SubmissionStatus("RunQueued", 0));
 
                         await runPublisher.PublishAsync(
                             new RunJobMessage(submission.Id, null, submission.Input, artifact.StorageKey),
@@ -167,11 +167,11 @@ namespace AlgoPlatform.Infrastructure.RabbitMQ.HostedServices
                         artifact.StorageKey = null;
                         artifact.UpdatedAt = now;
 
-                        submission.Status = "Compiling";
+                        submission.Status = "CompileQueued";
                         submission.Error = null;
                         await uow.SaveChangesAsync(CancellationToken.None);
 
-                        await status.SetAsync(submissionId, new SubmissionStatus("Compiling", 0));
+                        await status.SetAsync(submissionId, new SubmissionStatus("CompileQueued", 0));
 
                         await compilePublisher.PublishAsync(
                             new CompileJobMessage(submission.Id, submission.Code, hash),
@@ -191,11 +191,11 @@ namespace AlgoPlatform.Infrastructure.RabbitMQ.HostedServices
                 }
                 else
                 {
-                    submission.Status = "Compiling";
+                    submission.Status = "CompileQueued";
                     submission.Error = null;
                     await uow.SaveChangesAsync(CancellationToken.None);
 
-                    await status.SetAsync(submissionId, new SubmissionStatus("Compiling", 0));
+                    await status.SetAsync(submissionId, new SubmissionStatus("CompileQueued", 0));
                 }
 
                 await _channel.BasicAckAsync(ea.DeliveryTag, multiple: false);

@@ -39,6 +39,8 @@
 
     
     <script defer src="/js/editor/templates.js"></script>
+    <script defer src="/js/runner/status-panel.js"></script>
+    <script defer src="/js/runner/raw-log-export.js"></script>
     <script defer src="/js/runner/runner.js"></script>
   </head>
 
@@ -46,7 +48,7 @@
     <div class="run-status" id="run-status" aria-live="polite">
       <div class="run-status-title">Статус выполнения</div>
       <div class="run-status-row">
-        <span id="run-status-text">Idle</span>
+        <span id="run-status-text">Ожидание</span>
       </div>
       <div class="run-status-row">
         <span class="run-status-label">Время:</span>
@@ -57,11 +59,18 @@
           <span class="run-status-step-name">Очередь</span>
           <span class="run-status-step-time" data-stage-time="Queued">0 сек</span>
         </div>
+        <div class="run-status-step is-hidden" data-stage="CompileQueued">
+          <span class="run-status-step-name">Ожидание компилятора</span>
+          <span class="run-status-step-time" data-stage-time="CompileQueued">0 сек</span>
+        </div>
         <div class="run-status-step is-hidden" data-stage="Compiling">
           <span class="run-status-step-name">Компиляция</span>
           <span class="run-status-step-time" data-stage-time="Compiling">0 сек</span>
         </div>
-        <div class="run-status-step is-hidden" data-stage="Running">
+        <div class="run-status-step is-hidden" data-stage="RunQueued">
+          <span class="run-status-step-name">Ожидание запуска</span>
+          <span class="run-status-step-time" data-stage-time="RunQueued">0 сек</span>
+        </div>        <div class="run-status-step is-hidden" data-stage="Running">
           <span class="run-status-step-name">Выполнение</span>
           <span class="run-status-step-time" data-stage-time="Running">0 сек</span>
         </div>
@@ -457,14 +466,24 @@
         <div class="panel is-hidden" id="graph-panel">
           <h2>Граф</h2>
 
-          <div class="row gap-12">
+          <div class="row gap-12 graph-controls-row">
             <label for="node-label">Вершина:</label>
             <input id="node-label" type="text" placeholder="A" class="w-120" />
             <button id="add-node" class="primary">Добавить вершину</button>
             <button id="clear-graph">Очистить граф</button>
           </div>
 
-          <div class="row mt-8 gap-10">
+          <div class="adj-matrix-inline">
+            <div class="adj-matrix-inline-title">Матрица смежности</div>
+            <textarea
+              id="adj-matrix-input"
+              rows="3"
+              placeholder="0 1 0&#10;0 0 1&#10;1 0 0"
+              style="width:100%; resize:vertical;"
+            ></textarea>
+          </div>
+
+          <div class="row mt-8 gap-10 graph-controls-row">
             <label for="edge-from">Ребро:</label>
             <select id="edge-from"></select>
             <span>→</span>
@@ -473,19 +492,20 @@
             <button id="delete-edge">Удалить ребро</button>
           </div>
 
-          <div class="row mt-8 gap-10">
+          <div class="row mt-8 gap-10 graph-controls-row">
             <label for="remove-node">Удалить вершину:</label>
             <select id="remove-node"></select>
             <button id="delete-node">Удалить вершину</button>
           </div>
 
-          <div class="row mt-8 gap-10">
+          <div class="row mt-8 gap-10 graph-controls-row">
             <label for="start-node">Старт:</label>
             <select id="start-node"></select>
             <label for="end-node" class="ml-12">Финиш:</label>
             <select id="end-node"></select>
           </div>
 
+          <div class="hint mt-8">Строки — вершины, значения через пробел/запятую/; . Ненулевое значение = есть ребро i → j.</div>
           <div class="mt-10">
             <strong>Вершины:</strong>
             <div id="graph-nodes" class="chips"></div>
@@ -569,6 +589,4 @@
      
   </body>
 </html>
-
-
 
