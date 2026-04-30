@@ -6,6 +6,8 @@
   const graphPanel = document.getElementById('graph-panel');
   const sandboxPanel = document.getElementById('sandbox-panel');
   const executionPanel = document.querySelector('.execution-panel');
+  const sandboxKindButtons = Array.from(document.querySelectorAll('[data-sandbox-kind]'));
+  const sandboxTheoryBlocks = Array.from(document.querySelectorAll('[data-sandbox-theory-kind]'));
   const theoryBlocks = Array.from(document.querySelectorAll('[data-theory]'));
   const binaryOnly = Array.from(document.querySelectorAll('[data-binary-only]'));
   const shuffleBtn = document.getElementById('shuffle');
@@ -17,12 +19,37 @@
   const modeViews = Array.from(document.querySelectorAll('[data-mode-view]'));
   const modeBadge = document.getElementById('mode-badge');
   const modeStorageKey = 'algo-mode';
+  const sandboxStorageKey = 'sandbox-kind';
   const arrayAlgos = new Set(['insertion', 'selection', 'quick', 'binary']);
   const arrayState = new Map();
   const baseByAlgo = new Map();
   let baseArray = null;
   let currentAlgo = null;
   let currentMode = 'auto';
+  let sandboxKind = 'array';
+
+  function normalizeSandboxKind(kind) {
+    return kind === 'graph' ? 'graph' : 'array';
+  }
+
+  function renderSandboxKind() {
+    sandboxKindButtons.forEach(button => {
+      const active = normalizeSandboxKind(button.dataset.sandboxKind) === sandboxKind;
+      button.classList.toggle('primary', active);
+      button.setAttribute('aria-pressed', active ? 'true' : 'false');
+    });
+    sandboxTheoryBlocks.forEach(block => {
+      block.classList.toggle('is-hidden', normalizeSandboxKind(block.dataset.sandboxTheoryKind) !== sandboxKind);
+    });
+  }
+
+  function setSandboxKind(kind, persist = true) {
+    sandboxKind = normalizeSandboxKind(kind);
+    if (persist) {
+      try { localStorage.setItem(sandboxStorageKey, sandboxKind); } catch {}
+    }
+    renderSandboxKind();
+  }
 
   function applyMode(mode) {
     currentMode = mode === 'controlled' ? 'controlled' : 'auto';
@@ -47,6 +74,12 @@
     let saved = null;
     try { saved = localStorage.getItem(modeStorageKey); } catch {}
     applyMode(saved || 'auto');
+  }
+
+  function initSandboxKind() {
+    let saved = null;
+    try { saved = localStorage.getItem(sandboxStorageKey); } catch {}
+    setSandboxKind(saved || 'array', false);
   }
 
   function getAlgoKey() {
@@ -88,6 +121,10 @@
     const isSandbox = algo === 'sandbox';
     const isGraph = algo === 'bfs' || algo === 'dfs';
     const isBinary = algo === 'binary';
+    const sandboxGraph = isSandbox && sandboxKind === 'graph';
+    const sandboxArray = isSandbox && !sandboxGraph;
+    const showArrayPanel = !isGraph && (!isSandbox || sandboxArray);
+    const showGraphPanel = isGraph || sandboxGraph;
     captureBaseArray();
     if (currentAlgo && currentAlgo !== algo) {
       saveArrayState(currentAlgo);
@@ -100,23 +137,26 @@
     });
     if (theoryPanel) theoryPanel.classList.toggle('is-hidden', isSandbox);
     if (sandboxPanel) sandboxPanel.classList.toggle('is-hidden', !isSandbox);
-    if (arrayPanel) arrayPanel.classList.toggle('is-hidden', isGraph || isSandbox);
-    if (graphPanel) graphPanel.classList.toggle('is-hidden', !isGraph || isSandbox);
-    if (executionPanel) executionPanel.classList.toggle('is-hidden', isSandbox);
+    if (arrayPanel) arrayPanel.classList.toggle('is-hidden', !showArrayPanel);
+    if (graphPanel) graphPanel.classList.toggle('is-hidden', !showGraphPanel);
+    if (executionPanel) executionPanel.classList.remove('is-hidden');
     theoryBlocks.forEach(b => b.classList.toggle('is-hidden', b.dataset.theory !== algo));
-    binaryOnly.forEach(el => el.classList.toggle('is-hidden', !isBinary));
+    binaryOnly.forEach(el => el.classList.toggle('is-hidden', !isBinary || isSandbox));
     if (shuffleBtn) {
-      shuffleBtn.disabled = isBinary;
-      shuffleBtn.title = isBinary ? 'Для бинарного поиска массив должен быть отсортирован' : '';
+      shuffleBtn.disabled = isBinary || sandboxGraph;
+      shuffleBtn.title = isBinary
+        ? 'Для бинарного поиска массив должен быть отсортирован'
+        : (sandboxGraph ? 'Для графа перемешивание массива не нужно' : '');
     }
     if (playbackControls) {
-      playbackControls.classList.toggle('is-hidden', isSandbox);
-      if (stepsPanel) stepsPanel.classList.toggle('is-hidden', isSandbox);
-      const target = isGraph ? playbackAnchorGraph : playbackAnchorArray;
-      if (!isSandbox && target && playbackControls.parentNode !== target) {
+      playbackControls.classList.remove('is-hidden');
+      if (stepsPanel) stepsPanel.classList.remove('is-hidden');
+      const useGraphPane = isSandbox ? sandboxGraph : isGraph;
+      const target = useGraphPane ? playbackAnchorGraph : playbackAnchorArray;
+      if (target && playbackControls.parentNode !== target) {
         target.appendChild(playbackControls);
       }
-      if (!isSandbox && target && stepsPanel && stepsPanel.parentNode !== target) {
+      if (target && stepsPanel && stepsPanel.parentNode !== target) {
         target.appendChild(stepsPanel);
       }
     }
@@ -138,6 +178,7 @@
 
   window.getCurrentAlgo = getAlgoKey;
   window.getAlgoMode = () => currentMode;
+  window.getSandboxKind = () => sandboxKind;
   window.resetArrayToBase = resetArrayToBase;
 
   tabs.forEach(t => {
@@ -156,8 +197,13 @@
   document.querySelectorAll('[data-sandbox-template]').forEach(button => {
     button.addEventListener('click', () => {
       const key = button.dataset.sandboxTemplate;
+      const kind = normalizeSandboxKind(button.dataset.sandboxKind || (String(key).includes('graph') ? 'graph' : 'array'));
+      setSandboxKind(kind);
       if (window.applyEditorTemplateKey && key) {
         window.applyEditorTemplateKey(key);
+      }
+      if (getAlgoKey() === 'sandbox') {
+        applyAlgo('sandbox');
       }
     });
   });
@@ -165,6 +211,7 @@
   window.addEventListener('hashchange', () => applyAlgo(getAlgoKey()));
 
   initMode();
+  initSandboxKind();
 
   if (!location.hash) {
     location.hash = '#insertion';
@@ -175,7 +222,8 @@
   applyAlgo(getAlgoKey());
 
   function updateLegendForAlgo(algo) {
-    const isGraph = algo === 'bfs' || algo === 'dfs';
+    const isSandbox = algo === 'sandbox';
+    const isGraph = isSandbox ? sandboxKind === 'graph' : (algo === 'bfs' || algo === 'dfs');
     const mode = currentMode;
     const arrayLegend = document.querySelector('[data-legend-scope="array"]');
     const graphLegend = document.querySelector('[data-legend-scope="graph"]');
@@ -183,7 +231,9 @@
     const cfg = window.LEGEND_CONFIG || { auto: {}, controlled: {}, graph: {} };
 
     if (arrayLegend) {
-      const keys = (mode === 'controlled' ? cfg.controlled : cfg.auto)[algo] || [];
+      const keys = isSandbox
+        ? ((cfg.sandbox || {}).array || [])
+        : ((mode === 'controlled' ? cfg.controlled : cfg.auto)[algo] || []);
       const items = arrayLegend.querySelectorAll('[data-legend-item]');
       items.forEach(el => {
         const key = el.dataset.legendItem;
@@ -192,7 +242,9 @@
     }
 
     if (graphLegend) {
-      const keys = (cfg.graph || {})[algo] || [];
+      const keys = isSandbox
+        ? ((cfg.sandbox || {}).graph || [])
+        : ((cfg.graph || {})[algo] || []);
       const items = graphLegend.querySelectorAll('[data-legend-item]');
       items.forEach(el => {
         const key = el.dataset.legendItem;

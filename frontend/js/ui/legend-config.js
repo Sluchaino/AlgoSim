@@ -16,6 +16,10 @@
     graph: {
       bfs: ['start', 'end', 'frontier', 'visited', 'current', 'path', 'notfound', 'edge-active', 'edge-path', 'edge-notfound'],
       dfs: ['start', 'end', 'frontier', 'visited', 'current', 'path', 'notfound', 'edge-active', 'edge-path', 'edge-notfound']
+    },
+    sandbox: {
+      array: ['compare', 'swap', 'read', 'write', 'key', 'min', 'pivot', 'sorted', 'mid', 'found', 'range'],
+      graph: ['start', 'end', 'frontier', 'visited', 'current', 'path', 'notfound', 'edge-active', 'edge-path', 'edge-notfound']
     }
   };
 })();

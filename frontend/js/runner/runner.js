@@ -36,7 +36,10 @@
 
   function resolveTemplateKey(algo, mode) {
     const safeAlgo = algo || 'insertion';
-    if (safeAlgo === 'sandbox') return 'sandbox_array';
+    if (safeAlgo === 'sandbox') {
+      const sandboxKind = window.getSandboxKind ? window.getSandboxKind() : 'array';
+      return sandboxKind === 'graph' ? 'sandbox_graph' : 'sandbox_array';
+    }
     if (mode === 'controlled') {
       const specific = `controlled_${safeAlgo}`;
       if (window.TEMPLATES && window.TEMPLATES[specific]) return specific;

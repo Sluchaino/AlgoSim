@@ -8,8 +8,9 @@
 
 .topbar-inner {
   display: flex;
-  align-items: center;
-  gap: 14px;
+  flex-direction: column;
+  align-items: stretch;
+  gap: 10px;
   padding: 10px 0;
 }
 
@@ -26,10 +27,13 @@
   display: flex;
   align-items: center;
   flex: 1 1 auto;
+  width: 100%;
+  flex-wrap: nowrap;
   gap: 8px;
   min-width: 0;
   overflow-x: auto;
-  scrollbar-width: thin;
+  overflow-y: hidden;
+  padding-bottom: 2px;
 }
 
 .tab {
@@ -70,13 +74,12 @@
 }
 
 @media (max-width: 1100px) {
-  .topbar-inner { gap: 10px; }
+  .topbar-inner { gap: 8px; }
   .tab { padding-inline: 8px; font-size: 12px; }
 }
 
 @media (max-width: 420px) {
-  .topbar-inner { align-items: flex-start; }
-  .tabs { width: 100%; }
+  .topbar-inner { align-items: stretch; }
 }
 
 .run-status {

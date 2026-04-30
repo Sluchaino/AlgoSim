@@ -463,6 +463,39 @@ h2 { font-size: 18px; margin: 0 0 10px; }
   margin: 12px 0;
 }
 
+.sandbox-structure-actions {
+  margin: 10px 0 0;
+}
+
+.sandbox-kind-block {
+  padding: 12px 0 0;
+  border-top: 1px solid #e2e8f0;
+}
+
+.sandbox-kind-block h3 {
+  margin-bottom: 8px;
+}
+
+.sandbox-kind-block ul {
+  margin: 8px 0 0 18px;
+  padding: 0;
+}
+
+.sandbox-kind-block li {
+  margin: 4px 0;
+}
+
+.sandbox-frontend-note {
+  margin-top: 8px;
+  padding: 10px 12px;
+  border-radius: 10px;
+  background: #f8fafc;
+  border: 1px solid #e2e8f0;
+  color: #475569;
+  font-size: 13px;
+  line-height: 1.55;
+}
+
 @media (max-width: 900px) {
   .wrap { margin: 16px auto; }
 }

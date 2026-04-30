@@ -237,40 +237,52 @@
 
         <div class="panel is-hidden" id="sandbox-panel">
           <h2>Песочница алгоритма</h2>
-          <p class="lead">Здесь собраны шаблоны и правила работы с библиотекой логирования. Слева описание, справа редактор кода, как на страницах алгоритмов.</p>
-          <div class="row sandbox-template-actions">
-            <button class="primary" type="button" data-sandbox-template="sandbox_array">Шаблон для массива</button>
-            <button type="button" data-sandbox-template="sandbox_graph">Шаблон для графа</button>
+          <p class="lead">Здесь есть отдельная настройка структуры данных, а теория ниже меняется в зависимости от выбранного шаблона. Справа остаётся тот же редактор кода, как и на страницах алгоритмов. Пользователь меняет только тело алгоритма, а шаблон уже подсказывает, какие функции логирования нужны и что именно анимирует фронтенд.</p>
+          <div class="row sandbox-structure-actions">
+            <button class="primary" type="button" data-sandbox-kind="array" data-sandbox-template="sandbox_array">Массив</button>
+            <button type="button" data-sandbox-kind="graph" data-sandbox-template="sandbox_graph">Граф</button>
           </div>
 
           <div class="sandbox-guide">
-            <div>
-              <h3>Что пишет пользователь</h3>
-              <p>В шаблоне уже есть чтение входных данных, создание структуры, запуск функции и отправка событий визуализации. Пользователь меняет только функцию алгоритма.</p>
-              <p>Выводить результат в консоль не нужно. Визуализация строится по событиям, которые собирает библиотека.</p>
-            </div>
-
-            <div>
-              <h3>Шаблон для массивов</h3>
-              <p><code>TrackedList a</code> используется для сортировок и бинарного поиска. Он логирует чтения, сравнения, записи и обмены.</p>
-              <p><code>ITracer t</code> нужен для дополнительных событий: выделить ключ, минимум, опорный элемент, диапазон или указатель.</p>
-            </div>
-
-            <div>
-              <h3>Шаблон для графов</h3>
-              <p><code>TrackedAdjacencyList adj</code> хранит список смежности и логирует проверку ребер.</p>
-              <p><code>TrackedVisited</code>, <code>TrackedQueue</code> и <code>TrackedStack</code> показывают посещенные вершины, очередь BFS, стек DFS и текущую вершину.</p>
-              <p>Маршрут для BFS/DFS записывается в <code>out List&lt;int&gt; path</code>. Обычно путь восстанавливается от конечной вершины к начальной через массив родителей, затем разворачивается.</p>
-            </div>
-
-            <div>
-              <h3>Когда анимация ломается</h3>
+            <div class="sandbox-kind-block" data-sandbox-theory-kind="array">
+              <h3>Шаблон для массива</h3>
+              <p>Этот шаблон нужен для сортировок и бинарного поиска. Пользователь меняет только функцию алгоритма, а <code>Main</code> уже читает вход, создаёт <code>TrackedList</code> и запускает визуализацию.</p>
+              <p>Используйте функции логирования в момент реального действия алгоритма: <code>Read</code> перед чтением элемента, <code>Compare</code> перед сравнением, <code>Write</code> при записи значения, <code>Swap</code> при обмене, <code>Range</code> для активного диапазона, <code>Ptr</code> для указателя, <code>Mark*</code> для смысловых меток и <code>Step</code> для текстового пояснения шага.</p>
               <ul>
-                <li>Если заменить отслеживаемые структуры обычными коллекциями.</li>
-                <li>Если проверять <code>start</code> и <code>end</code> после обращения к массивам.</li>
-                <li>Если не заполнить <code>out List&lt;int&gt; path</code> при найденном маршруте.</li>
-                <li>Если события ручного логирования не соответствуют реальным действиям алгоритма.</li>
+                <li><code>EmitArray</code> отправляет текущий массив на сцену до запуска алгоритма.</li>
+                <li><code>Read</code> отмечает чтение элемента.</li>
+                <li><code>Compare</code> отмечает сравнение двух элементов.</li>
+                <li><code>Write</code> отмечает запись значения в позицию массива.</li>
+                <li><code>Swap</code> отмечает обмен двух элементов.</li>
+                <li><code>Mark</code> помечает элемент произвольной меткой, а <code>MarkKey</code>, <code>MarkMin</code>, <code>MarkPivot</code> и <code>MarkSorted</code> дают готовые смысловые метки.</li>
+                <li><code>Range</code>, <code>ClearRange</code> и <code>ClearRanges</code> показывают активный диапазон.</li>
+                <li><code>Ptr</code> и <code>ClearPtr</code> показывают указатель алгоритма.</li>
+                <li><code>Step</code> можно использовать для дополнительного текстового шага.</li>
               </ul>
+              <div class="sandbox-frontend-note">
+                Фронтенд анимирует кружки массива, их сравнение, чтение, запись, обмен, подсветку ключа, минимума, pivot, отсортированной части, диапазоны и указатели. Для ручного шаблона можно добавить дополнительные шаги, но они должны соответствовать реальным действиям алгоритма.
+              </div>
+            </div>
+
+            <div class="sandbox-kind-block is-hidden" data-sandbox-theory-kind="graph">
+              <h3>Шаблон для графа</h3>
+              <p>Этот шаблон нужен для BFS и DFS. Пользователь получает <code>TrackedAdjacencyList</code>, вершины <code>start</code> и <code>end</code>, а маршрут возвращает через <code>out List&lt;int&gt; path</code>.</p>
+              <p>Используйте функции логирования по ходу обхода: <code>GraphInit</code> перед стартом сцены, <code>MarkStart</code> и <code>MarkEnd</code> для границ поиска, <code>MarkFrontier</code> когда вершина попадает в очередь или стек, <code>MarkCurrent</code> для текущей вершины, <code>MarkVisited</code> после посещения, <code>Path</code> при восстановлении найденного маршрута и <code>NotFound</code>, если путь не существует.</p>
+              <ul>
+                <li><code>GraphInit</code> задаёт старт и финиш для сцены графа.</li>
+                <li><code>MarkStart</code> и <code>MarkEnd</code> выделяют начальную и конечную вершины.</li>
+                <li><code>MarkFrontier</code> показывает вершины, которые лежат в очереди BFS или стеке DFS.</li>
+                <li><code>MarkCurrent</code> показывает вершину, которую алгоритм обрабатывает прямо сейчас.</li>
+                <li><code>MarkVisited</code> отмечает уже посещённую вершину.</li>
+                <li><code>Path</code> подсвечивает найденный путь, а <code>NotFound</code> показывает, что маршрут не найден.</li>
+              </ul>
+              <div class="sandbox-frontend-note">
+                Фронтенд анимирует вершины, рёбра, старт, финиш, текущую вершину, очередь или стек, посещённые вершины и итоговый путь. Если путь строится по родителям, он должен быть записан в <code>out List&lt;int&gt; path</code> и развёрнут перед возвратом.
+              </div>
+            </div>
+
+            <div class="sandbox-frontend-note">
+              В песочнице пользователь меняет только тело алгоритма. Ввод уже подготовлен в шаблоне, а в консоль ничего выводить не нужно.
             </div>
           </div>
         </div>
