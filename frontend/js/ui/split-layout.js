@@ -3,7 +3,11 @@
   const resizer = document.getElementById('split-resizer');
   if (!layout || !resizer) return;
 
-  const STORAGE_KEY = 'algosim.split.leftPanePercent.v6';
+  const STORAGE_KEY = 'algosim.split.leftPanePercent.v7';
+  const LEGACY_KEYS = [
+    'algosim.split.leftPanePercent.v5',
+    'algosim.split.leftPanePercent.v6'
+  ];
   const MIN = 35;
   const MAX = 80;
   const DEFAULT = 60;
@@ -21,6 +25,10 @@
     if (persist) localStorage.setItem(STORAGE_KEY, String(next));
     window.dispatchEvent(new Event('resize'));
   }
+
+  try {
+    for (const key of LEGACY_KEYS) localStorage.removeItem(key);
+  } catch {}
 
   function percentFromClientX(clientX) {
     const rect = layout.getBoundingClientRect();
