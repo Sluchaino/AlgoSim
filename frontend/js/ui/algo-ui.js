@@ -31,8 +31,8 @@
     });
     if (modeBadge) {
       modeBadge.textContent = currentMode === 'controlled'
-        ? 'Контроль: используйте ITracer/TracingExtensions и __STEP__'
-        : 'Авто-анимация: TrackedList и обычные операции';
+        ? 'Шаблон: ручное логирование'
+        : 'Шаблон: обычный алгоритм';
     }
     try { localStorage.setItem(modeStorageKey, currentMode); } catch {}
     updateLegendForAlgo(getAlgoKey());

@@ -8,6 +8,7 @@ using AlgoTracing;
 
 class Program
 {
+  // Пишите алгоритм в этой функции. Main ниже уже читает массив и запускает ее.
   static void InsertionSort(TrackedList a, ITracer t)
   {
     for (int i = 1; i < a.Count; i++)
@@ -57,7 +58,7 @@ class Program
     TracingExtensions.EmitArray(t, a.ToArray());
     InsertionSort(a, t);
 
-    Console.WriteLine(string.Join(", ", a.ToArray()));
+    // Выводить результат в консоль не нужно: визуализация уже получила шаги.
   }
 }`;
 
@@ -69,6 +70,7 @@ using AlgoTracing;
 
 class Program
 {
+  // Пишите алгоритм в этой функции. Main ниже уже читает массив и запускает ее.
   static void InsertionSort(int[] a, ITracer t)
   {
     for (int i = 1; i < a.Length; i++)
@@ -129,7 +131,7 @@ class Program
     TracingExtensions.EmitArray(t, a);
     InsertionSort(a, t);
 
-    Console.WriteLine(string.Join(", ", a));
+    // Выводить результат в консоль не нужно: визуализация уже получила шаги.
   }
 }`;
 
@@ -141,6 +143,7 @@ using AlgoTracing;
 
 class Program
 {
+  // Пишите алгоритм в этой функции. Main ниже уже читает массив и запускает ее.
   static void SelectionSort(TrackedList a, ITracer t)
   {
     for (int i = 0; i < a.Count - 1; i++)
@@ -192,7 +195,7 @@ class Program
     TracingExtensions.EmitArray(t, a.ToArray());
     SelectionSort(a, t);
 
-    Console.WriteLine(string.Join(", ", a.ToArray()));
+    // Выводить результат в консоль не нужно: визуализация уже получила шаги.
   }
 }`;
 
@@ -204,6 +207,7 @@ using AlgoTracing;
 
 class Program
 {
+  // Пишите алгоритм в этой функции. Main ниже уже читает массив и запускает ее.
   static void SelectionSort(int[] a, ITracer t)
   {
     for (int i = 0; i < a.Length - 1; i++)
@@ -263,7 +267,7 @@ class Program
     TracingExtensions.EmitArray(t, a);
     SelectionSort(a, t);
 
-    Console.WriteLine(string.Join(", ", a));
+    // Выводить результат в консоль не нужно: визуализация уже получила шаги.
   }
 }`;
 
@@ -275,6 +279,7 @@ using AlgoTracing;
 
 class Program
 {
+  // Пишите алгоритм в этой функции. Main ниже уже читает массив и запускает ее.
   static void QuickSort(TrackedList a, int left, int right, ITracer t)
   {
     if (left >= right) return;
@@ -329,7 +334,7 @@ class Program
     TracingExtensions.EmitArray(t, a.ToArray());
     QuickSort(a, 0, a.Count - 1, t);
 
-    Console.WriteLine(string.Join(", ", a.ToArray()));
+    // Выводить результат в консоль не нужно: визуализация уже получила шаги.
   }
 }`;
 
@@ -341,6 +346,7 @@ using AlgoTracing;
 
 class Program
 {
+  // Пишите алгоритм в этой функции. Main ниже уже читает массив и запускает ее.
   static void QuickSort(int[] a, int left, int right, ITracer t)
   {
     if (left > right) return;
@@ -450,7 +456,7 @@ class Program
     TracingExtensions.EmitArray(t, a);
     QuickSort(a, 0, a.Length - 1, t);
 
-    Console.WriteLine(string.Join(", ", a));
+    // Выводить результат в консоль не нужно: визуализация уже получила шаги.
   }
 }`;
 
@@ -462,6 +468,7 @@ using AlgoTracing;
 
 class Program
 {
+  // Пишите алгоритм в этой функции. Main ниже уже читает массив и запускает ее.
   static int BinarySearch(TrackedList a, int target, ITracer t)
   {
     int l = 0, r = a.Count - 1;
@@ -507,10 +514,10 @@ class Program
 
     TracingExtensions.EmitArray(t, a.ToArray());
     TracingExtensions.BeginBinarySearch(t, a.Count, target);
-    var idx = BinarySearch(a, target, t);
+    BinarySearch(a, target, t);
     TracingExtensions.EndBinarySearch(t);
 
-    Console.WriteLine(idx);
+    // Индекс возвращается из функции; выводить его в консоль не нужно.
   }
 }`;
 
@@ -522,6 +529,7 @@ using AlgoTracing;
 
 class Program
 {
+  // Пишите алгоритм в этой функции. Main ниже уже читает массив и запускает ее.
   static int BinarySearch(int[] a, int target, ITracer t)
   {
     int l = 0, r = a.Length - 1;
@@ -580,8 +588,8 @@ class Program
     int[] a = ReadValues(out target);
     TracingExtensions.EmitArray(t, a);
 
-    int idx = BinarySearch(a, target, t);
-    Console.WriteLine(idx);
+    BinarySearch(a, target, t);
+    // Индекс возвращается из функции; выводить его в консоль не нужно.
   }
 }`;
 
@@ -630,7 +638,7 @@ class Program
     TracingExtensions.EmitArray(t, a.ToArray());
     Algorithm(a, t);
 
-    Console.WriteLine(string.Join(", ", a.ToArray()));
+    // Выводить результат в консоль не нужно: визуализация уже получила шаги.
   }
 }`;
 
@@ -653,22 +661,32 @@ class Program
     TracingExtensions.Range(t, "window", 0, 1, "active");
     TracingExtensions.ClearRange(t, "window");
 
-    Console.WriteLine(string.Join(", ", a.ToArray()));
+    // Выводить результат в консоль не нужно: визуализация уже получила шаги.
   }
 }`;
 
   const bfs =
 `using System;
-using System.Text.Json;
 using System.Collections.Generic;
-using System.Linq;
 using AlgoTracing;
 
 class Program
 {
-  static List<int> Bfs(TrackedAdjacencyList adj, int start, int end)
+  // Пишите алгоритм в этой функции. Main ниже уже читает граф и запускает ее.
+  static bool Bfs(TrackedAdjacencyList adj, int start, int end, out List<int> path)
   {
     int V = adj.Count;
+    path = new List<int>();
+
+    if (start < 0 || start >= V || end < 0 || end >= V)
+      return false;
+
+    if (start == end)
+    {
+      path.Add(start);
+      return true;
+    }
+
     var visited = new TrackedVisited(V, adj);
     var parent = new int[V];
     for (int i = 0; i < V; i++) parent[i] = -1;
@@ -692,14 +710,13 @@ class Program
       }
     }
 
-    if (end < 0 || end >= V || (!visited[end] && start != end))
-      return new List<int>();
+    if (!visited[end])
+      return false;
 
-    var path = new List<int>();
     for (int cur = end; cur != -1; cur = parent[cur])
       path.Add(cur);
     path.Reverse();
-    return path;
+    return true;
   }
 
   static void Main()
@@ -711,38 +728,40 @@ class Program
     var adj = GraphInput.Parse(input, t, out start, out end, out startLabel, out endLabel);
     adj.GraphInit(startLabel, endLabel);
 
-    if (start < 0 || end < 0)
+    List<int> path;
+    var found = Bfs(adj, start, end, out path);
+    if (!found)
     {
       adj.NotFound();
-      Console.WriteLine("false");
-      return;
-    }
-
-    var path = Bfs(adj, start, end);
-    if (path.Count == 0)
-    {
-      adj.NotFound();
-      Console.WriteLine("false");
       return;
     }
 
     adj.Path(path);
-    Console.WriteLine(string.Join("->", path.Select(adj.LabelOf)));
   }
 }`;
 
   const dfs =
 `using System;
-using System.Text.Json;
 using System.Collections.Generic;
-using System.Linq;
 using AlgoTracing;
 
 class Program
 {
+  // Пишите алгоритм в этой функции. Main ниже уже читает граф и запускает ее.
   static bool Dfs(TrackedAdjacencyList adj, int start, int end, out List<int> path)
   {
     int V = adj.Count;
+    path = new List<int>();
+
+    if (start < 0 || start >= V || end < 0 || end >= V)
+      return false;
+
+    if (start == end)
+    {
+      path.Add(start);
+      return true;
+    }
+
     var visited = new TrackedVisited(V, adj);
     var parent = new int[V];
     for (int i = 0; i < V; i++) parent[i] = -1;
@@ -766,13 +785,9 @@ class Program
       }
     }
 
-    if (end < 0 || end >= V || (!visited[end] && start != end))
-    {
-      path = new List<int>();
+    if (!visited[end])
       return false;
-    }
 
-    path = new List<int>();
     for (int cur = end; cur != -1; cur = parent[cur])
       path.Add(cur);
     path.Reverse();
@@ -788,24 +803,15 @@ class Program
     var adj = GraphInput.Parse(input, t, out start, out end, out startLabel, out endLabel);
     adj.GraphInit(startLabel, endLabel);
 
-    if (start < 0 || end < 0)
-    {
-      adj.NotFound();
-      Console.WriteLine("false");
-      return;
-    }
-
     List<int> path;
     var found = Dfs(adj, start, end, out path);
     if (!found)
     {
       adj.NotFound();
-      Console.WriteLine("false");
       return;
     }
 
     adj.Path(path);
-    Console.WriteLine(string.Join("->", path.Select(adj.LabelOf)));
   }
 }`;
 

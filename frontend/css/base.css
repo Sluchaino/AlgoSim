@@ -390,6 +390,12 @@ h2 { font-size: 18px; margin: 0 0 10px; }
   margin-bottom: 16px;
 }
 
+.sandbox-intro {
+  margin: 0 0 12px;
+  color: #475569;
+  font-size: 14px;
+}
+
 .mode-grid {
   display: grid;
   grid-template-columns: repeat(2, minmax(0, 1fr));
@@ -428,6 +434,29 @@ h2 { font-size: 18px; margin: 0 0 10px; }
   margin-top: 10px;
   font-size: 13px;
   color: #475569;
+}
+
+.sandbox-guide {
+  display: grid;
+  gap: 12px;
+  margin-top: 14px;
+}
+
+.sandbox-guide h3 {
+  margin: 0 0 6px;
+  font-size: 14px;
+  color: #0f172a;
+}
+
+.sandbox-guide p {
+  margin: 0 0 6px;
+  color: #475569;
+  font-size: 13px;
+  line-height: 1.55;
+}
+
+.sandbox-guide p:last-child {
+  margin-bottom: 0;
 }
 
 @media (max-width: 900px) {

@@ -125,7 +125,7 @@
     binary: {
       funcName: 'BinarySearch',
       signature: 'static int BinarySearch(TrackedList a, int target, ITracer t)',
-      call: '    var idx = BinarySearch(a, target, t);\n    Console.WriteLine(idx);',
+      call: '    BinarySearch(a, target, t);',
       needsTarget: true,
       printArray: false,
       useTracked: true
@@ -160,7 +160,7 @@
     binary: {
       funcName: 'BinarySearch',
       signature: 'static int BinarySearch(int[] a, int target, ITracer t)',
-      call: '    var idx = BinarySearch(a, target, t);\n    Console.WriteLine(idx);',
+      call: '    BinarySearch(a, target, t);',
       needsTarget: true,
       printArray: false,
       useTracked: false
@@ -219,11 +219,7 @@ class Program {
 `;
   function buildWrapMain(meta) {
     const isBinary = meta.funcName === 'BinarySearch' && meta.needsTarget;
-    const printLine = meta.printArray
-      ? (meta.useTracked
-        ? '    Console.WriteLine(string.Join(", ", a.ToArray()));'
-        : '    Console.WriteLine(string.Join(", ", a));')
-      : '';
+    const printLine = '';
 
     const initLines = meta.useTracked
       ? '    int[] raw = ReadValues(out target);\n    var a = new TrackedList(raw, t);\n    TracingExtensions.EmitArray(t, a.ToArray());'
