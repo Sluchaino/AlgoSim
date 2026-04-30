@@ -246,14 +246,14 @@
           <div class="sandbox-guide">
             <div class="sandbox-kind-block" data-sandbox-theory-kind="array">
               <h3>Шаблон для массива</h3>
-              <p>Этот шаблон нужен для сортировок и бинарного поиска. Ниже показано, как вызывать функции логирования прямо в коде.</p>
+              <p>Этот шаблон нужен для сортировок и бинарного поиска. В нём используется обычный <code>int[] a</code>, а не <code>TrackedList</code>. Ниже показано, как вызывать функции логирования прямо в коде.</p>
               <ul>
                 <li><code>TracingExtensions.EmitArray(t, a.ToArray())</code> отправляет текущий массив на сцену до запуска алгоритма.</li>
                 <li><code>Read(a[i])</code> или <code>t.Read(i)</code> отмечает чтение элемента.</li>
                 <li><code>Compare(a[i], a[j])</code> или <code>t.Compare(i, j)</code> отмечает сравнение двух элементов.</li>
                 <li><code>Swap(a[i], a[j])</code> или <code>t.Swap(i, j)</code> отмечает обмен двух элементов.</li>
                 <li><code>TracingExtensions.MarkKey(t, i)</code>, <code>TracingExtensions.MarkMin(t, i)</code>, <code>TracingExtensions.MarkPivot(t, i)</code> и <code>TracingExtensions.MarkSorted(t, i)</code> дают готовые смысловые метки.</li>
-                <li><code>Range(t, "window", l, r)</code> или <code>TracingExtensions.Range(t, "window", l, r, "active")</code> показывает активный диапазон, а <code>ClearRange(t, "window")</code> и <code>ClearRanges(t)</code> убирают подсветку.</li>
+                <li><code>Range(t, "window", l, r)</code> или <code>TracingExtensions.Range(t, "window", l, r, "active")</code> показывает активный диапазон, а <code>TracingExtensions.ClearRange(t, "window")</code> и <code>TracingExtensions.ClearRanges(t)</code> убирают подсветку.</li>
                 <li><code>Ptr(t, "i", index)</code> или <code>TracingExtensions.Ptr(t, "i", index, "left")</code> показывает указатель алгоритма.</li>
                 <li><code>t.Step("Текст шага")</code> можно использовать для дополнительного текстового шага.</li>
               </ul>

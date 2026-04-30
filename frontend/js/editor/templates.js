@@ -797,19 +797,20 @@ class Program
   const sandboxArray =
 `using System;
 using System.Collections.Generic;
+using System.Linq;
 using System.Text.Json;
 using AlgoTracing;
 
 class Program
 {
   // Меняйте только эту функцию: здесь находится алгоритм для массива.
-  // TrackedList a логирует чтения, сравнения, записи и обмены.
+  // Здесь используется обычный int[] a.
   // ITracer t нужен для ручных пометок: ключ, минимум, pivot, диапазон, указатели.
-  static void Algorithm(TrackedList a, ITracer t)
+  static void Algorithm(int[] a, ITracer t)
   {
     TracingExtensions.EmitArray(t, a.ToArray());
 
-    for (int i = 0; i < a.Count; i++)
+    for (int i = 0; i < a.Length; i++)
     {
       t.Read(i);
     }
@@ -843,7 +844,7 @@ class Program
     ITracer t = new JsonConsoleTracer();
     int target;
     int[] raw = ReadValues(out target);
-    var a = new TrackedList(raw, t);
+    var a = raw;
 
     Algorithm(a, t);
   }
