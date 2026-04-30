@@ -39,6 +39,10 @@
   }
 
   function initMode() {
+    if (!modeInputs.length) {
+      applyMode('auto');
+      return;
+    }
     let saved = null;
     try { saved = localStorage.getItem(modeStorageKey); } catch {}
     applyMode(saved || 'auto');

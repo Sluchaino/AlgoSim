@@ -459,6 +459,26 @@ h2 { font-size: 18px; margin: 0 0 10px; }
   margin-bottom: 0;
 }
 
+.sandbox-page .grid {
+  align-items: stretch;
+}
+
+.code-sample {
+  margin: 10px 0;
+  padding: 12px;
+  overflow-x: auto;
+  border-radius: 12px;
+  border: 1px solid #dbe4f0;
+  background: #0f172a;
+  color: #e2e8f0;
+  font-size: 13px;
+  line-height: 1.5;
+}
+
+.code-sample code {
+  color: inherit;
+}
+
 @media (max-width: 900px) {
   .wrap { margin: 16px auto; }
 }

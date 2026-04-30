@@ -100,6 +100,7 @@
           <a class="tab" data-algo="binary" href="#binary">Бинарный поиск</a>
           <a class="tab" data-algo="dfs" href="#dfs">Поиск в глубину</a>
           <a class="tab" data-algo="bfs" href="#bfs">Поиск в ширину</a>
+          <a class="tab" href="sandbox.html">Песочница алгоритма</a>
         </nav>
       </div>
     </header>
@@ -107,59 +108,7 @@
       <section class="split-pane split-pane-left" id="split-left">
         <div class="left-content">
           <h1>Конструктор массива и редактор алгоритмов на C#</h1>
-          <p class="lead">Выберите алгоритм в шапке, настройте входные данные и запустите код. Платформа подготовит структуру данных, выполнит алгоритм в песочнице и построит визуализацию по логам.</p>
-
-          <div class="panel mode-panel sandbox-panel" id="mode-panel">
-        <h2>Песочница алгоритма</h2>
-        <p class="sandbox-intro">В редакторе уже подготовлен полный файл: чтение входных данных, создание структур, запуск функции алгоритма и отправка событий визуализации. От пользователя требуется менять только функцию алгоритма, а выводить результат в консоль не нужно.</p>
-
-        <div class="mode-grid sandbox-mode-grid">
-          <label class="mode-option">
-            <div class="mode-head">
-              <input type="radio" name="algo-mode" value="auto" checked />
-              <span class="mode-title">Обычный алгоритм</span>
-            </div>
-            <div class="mode-desc">Используйте отслеживаемые структуры как обычные коллекции, а операции чтения, сравнения и записи будут логироваться автоматически.</div>
-          </label>
-          <label class="mode-option">
-            <div class="mode-head">
-              <input type="radio" name="algo-mode" value="controlled" />
-              <span class="mode-title">Ручное логирование</span>
-            </div>
-            <div class="mode-desc">Дополнительно отмечайте важные события: выбранный ключ, минимум, опорный элемент, диапазон, указатель или найденный путь.</div>
-          </label>
-        </div>
-
-        <div class="sandbox-guide">
-          <div>
-            <h3>Два базовых шаблона</h3>
-            <p><strong>Массивы:</strong> шаблон создает <code>TrackedList a</code> и <code>ITracer t</code>, затем вызывает функцию выбранного алгоритма. В этой функции пользователь работает с массивом и при необходимости добавляет события логирования.</p>
-            <p><strong>Графы:</strong> шаблон создает <code>TrackedAdjacencyList adj</code>, получает <code>start</code> и <code>end</code>, затем вызывает функцию поиска. Найденный маршрут записывается в <code>out List&lt;int&gt; path</code>.</p>
-          </div>
-
-          <div>
-            <h3>Структуры для визуализации</h3>
-            <p><code>TrackedList</code> нужен для массивов: чтение элемента, сравнение, запись и обмен превращаются в шаги анимации. Если заменить его на обычный массив в обычном режиме, автоматическая анимация массива потеряет большую часть событий.</p>
-            <p><code>TrackedAdjacencyList</code> нужен для графов: при переборе соседей он логирует проверяемые ребра, а методы графа отмечают старт, финиш, текущую вершину, посещенные вершины и итоговый путь.</p>
-            <p><code>TrackedVisited</code>, <code>TrackedQueue</code> и <code>TrackedStack</code> нужны для BFS/DFS: они показывают посещение вершин, очередь/стек ожидания и текущую обрабатываемую вершину.</p>
-          </div>
-
-          <div>
-            <h3>Функции логирования</h3>
-            <p><code>EmitArray</code> отправляет текущее состояние массива на сцену. Обычно это делает подготовленный <code>Main</code> перед запуском алгоритма.</p>
-            <p><code>Read</code>, <code>Compare</code>, <code>Write</code> и <code>Swap</code> описывают базовые действия над массивом: чтение, сравнение, запись и обмен.</p>
-            <p><code>MarkKey</code>, <code>MarkMin</code>, <code>MarkPivot</code> и <code>MarkSorted</code> выделяют смысловые элементы алгоритма.</p>
-            <p><code>Range</code> показывает активный диапазон, а <code>Ptr</code> показывает указатель алгоритма. Для графов итоговый маршрут показывается через <code>adj.Path(path)</code>, а отсутствие маршрута через <code>adj.NotFound()</code>.</p>
-          </div>
-
-          <div class="mode-hint" data-mode-view="auto">
-            В обычном алгоритме не нужно вручную описывать каждый кадр. Главное — использовать подготовленные структуры и не заменять их обычными коллекциями без необходимости.
-          </div>
-          <div class="mode-hint is-hidden" data-mode-view="controlled">
-            При ручном логировании добавляйте события только там, где они помогают понять алгоритм. Если событие не связано с реальным действием алгоритма, анимация начнет расходиться с кодом.
-          </div>
-        </div>
-      </div>
+          <p class="lead">Выберите алгоритм в шапке, настройте входные данные и запустите код. Визуализация строится после выполнения программы по логам алгоритма.</p>
 
       
       <div class="grid">
@@ -612,18 +561,9 @@
             <button id="run" class="primary">Run</button>
             <button id="stop">Stop</button>
             <button id="export-raw-logs" disabled>Экспорт raw логов</button>
-            <span id="mode-badge" class="badge">Шаблон: обычный алгоритм</span>
           </div>
           <div id="console" class="console" aria-live="polite"></div>
         </div>
-      </div>
-
-      <div class="footer is-hidden" data-mode-view="controlled">
-        Поддержка контролируемых событий визуализации:
-        <code>{"kind":"setArray","value":[...]}</code>,
-        <code>{"kind":"swap","i":0,"j":1}</code>,
-        <code>{"kind":"set","i":0,"value":42}</code>.
-        В пользовательском алгоритме не требуется выводить результат в консоль.
       </div>
     </div>
       </section>
