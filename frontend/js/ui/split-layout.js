@@ -3,10 +3,10 @@
   const resizer = document.getElementById('split-resizer');
   if (!layout || !resizer) return;
 
-  const STORAGE_KEY = 'algosim.split.leftPanePercent';
+  const STORAGE_KEY = 'algosim.split.leftPanePercent.v2';
   const MIN = 35;
   const MAX = 80;
-  const DEFAULT = 65;
+  const DEFAULT = 60;
 
   function clamp(value) {
     return Math.min(MAX, Math.max(MIN, value));
