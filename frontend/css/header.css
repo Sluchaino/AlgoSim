@@ -155,6 +155,7 @@
 }
 
 .run-status[data-state="Running"] #run-status-text,
+.run-status[data-state="RunQueued"] #run-status-text,
 .run-status[data-state="Compiling"] #run-status-text,
 .run-status[data-state="Queued"] #run-status-text,
 .run-status[data-state="Retrying"] #run-status-text,

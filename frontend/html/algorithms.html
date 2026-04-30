@@ -36,6 +36,7 @@
     <script defer src="/js/ui/legend-config.js"></script>
     <script defer src="/js/ui/graph.js"></script>
     <script defer src="/js/ui/algo-ui.js"></script>
+    <script defer src="/js/ui/split-layout.js"></script>
 
     
     <script defer src="/js/editor/templates.js"></script>
@@ -44,7 +45,7 @@
     <script defer src="/js/runner/runner.js"></script>
   </head>
 
-  <body>
+  <body class="simulator-page">
     <div class="run-status" id="run-status" aria-live="polite">
       <div class="run-status-title">Статус выполнения</div>
       <div class="run-status-row">
@@ -70,7 +71,8 @@
         <div class="run-status-step is-hidden" data-stage="RunQueued">
           <span class="run-status-step-name">Ожидание запуска</span>
           <span class="run-status-step-time" data-stage-time="RunQueued">0 сек</span>
-        </div>        <div class="run-status-step is-hidden" data-stage="Running">
+        </div>
+        <div class="run-status-step is-hidden" data-stage="Running">
           <span class="run-status-step-name">Выполнение</span>
           <span class="run-status-step-time" data-stage-time="Running">0 сек</span>
         </div>
@@ -101,11 +103,13 @@
         </nav>
       </div>
     </header>
-    <div class="wrap">
-      <h1>Конструктор массива и редактор алгоритмов на C#</h1>
-      <p class="lead">Выберите алгоритм в шапке, настройте входные данные и запустите код. Визуализация для массивов строится автоматически, без ручных шагов.</p>
+    <main class="split-layout" id="split-layout" style="--left-pane:65%">
+      <section class="split-pane split-pane-left" id="split-left">
+        <div class="left-content">
+          <h1>Конструктор массива и редактор алгоритмов на C#</h1>
+          <p class="lead">Выберите алгоритм в шапке, настройте входные данные и запустите код. Визуализация для массивов строится автоматически, без ручных шагов.</p>
 
-      <div class="panel mode-panel" id="mode-panel">
+          <div class="panel mode-panel" id="mode-panel">
         <h2>Режим написания алгоритма</h2>
         <div class="mode-grid">
           <label class="mode-option">
@@ -560,20 +564,15 @@
           <div id="playback-controls-anchor-graph"></div>
         </div>
 
-        <div class="panel">
-          <h2>Редактор кода (C#)</h2>
-
-          <div id="editor" style="margin-top:10px"></div>
-
-          <div class="row controls" style="margin-top:10px">
+        <div class="panel execution-panel">
+          <h2>Запуск и сообщения</h2>
+          <div class="row controls execution-controls">
             <button id="run" class="primary">Run</button>
             <button id="stop">Stop</button>
             <button id="export-raw-logs" disabled>Экспорт raw логов</button>
             <span id="mode-badge" class="badge">Авто-анимация: TrackedList и обычные операции</span>
           </div>
-          
-
-          <div id="console" class="console" style="margin-top:10px" aria-live="polite"></div>
+          <div id="console" class="console" aria-live="polite"></div>
         </div>
       </div>
 
@@ -586,6 +585,15 @@
         <code>Console.WriteLine("__STEP__" + JsonSerializer.Serialize(obj));</code>
       </div>
     </div>
+      </section>
+      <div class="split-resizer" id="split-resizer" role="separator" aria-orientation="vertical" aria-label="Изменить ширину редактора" tabindex="0"></div>
+      <section class="split-pane split-pane-right" id="split-right">
+        <div class="panel code-editor-panel">
+          <h2>Редактор кода (C#)</h2>
+          <div id="editor" aria-label="Редактор кода C#"></div>
+        </div>
+      </section>
+    </main>
      
   </body>
 </html>
