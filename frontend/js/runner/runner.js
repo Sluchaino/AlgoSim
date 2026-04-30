@@ -36,6 +36,7 @@
 
   function resolveTemplateKey(algo, mode) {
     const safeAlgo = algo || 'insertion';
+    if (safeAlgo === 'sandbox') return 'sandbox_array';
     if (mode === 'controlled') {
       const specific = `controlled_${safeAlgo}`;
       if (window.TEMPLATES && window.TEMPLATES[specific]) return specific;
@@ -55,6 +56,13 @@
   }
 
   window.updateEditorTemplate = applyTemplateFromContext;
+  window.applyEditorTemplateKey = function (key) {
+    if (!editor || !window.TEMPLATES || !key) return;
+    const next = window.TEMPLATES[key];
+    if (typeof next === 'string') {
+      editor.setValue(next);
+    }
+  };
 
   (async function initEditor(){
     await window.__monacoReady;

@@ -3,7 +3,7 @@
   const resizer = document.getElementById('split-resizer');
   if (!layout || !resizer) return;
 
-  const STORAGE_KEY = 'algosim.split.leftPanePercent.v4';
+  const STORAGE_KEY = 'algosim.split.leftPanePercent.v5';
   const MIN = 35;
   const MAX = 80;
   const DEFAULT = 60;

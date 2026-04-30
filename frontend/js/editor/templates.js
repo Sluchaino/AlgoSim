@@ -1,5 +1,4 @@
-﻿// Templates for editor
-(function () {
+﻿(function () {
   const insertion =
 `using System;
 using System.Collections.Generic;
@@ -8,7 +7,6 @@ using AlgoTracing;
 
 class Program
 {
-  // Пишите алгоритм в этой функции. Main ниже уже читает массив и запускает ее.
   static void InsertionSort(TrackedList a, ITracer t)
   {
     for (int i = 1; i < a.Count; i++)
@@ -58,7 +56,6 @@ class Program
     TracingExtensions.EmitArray(t, a.ToArray());
     InsertionSort(a, t);
 
-    // Выводить результат в консоль не нужно: визуализация уже получила шаги.
   }
 }`;
 
@@ -70,7 +67,6 @@ using AlgoTracing;
 
 class Program
 {
-  // Пишите алгоритм в этой функции. Main ниже уже читает массив и запускает ее.
   static void InsertionSort(int[] a, ITracer t)
   {
     for (int i = 1; i < a.Length; i++)
@@ -131,7 +127,6 @@ class Program
     TracingExtensions.EmitArray(t, a);
     InsertionSort(a, t);
 
-    // Выводить результат в консоль не нужно: визуализация уже получила шаги.
   }
 }`;
 
@@ -143,7 +138,6 @@ using AlgoTracing;
 
 class Program
 {
-  // Пишите алгоритм в этой функции. Main ниже уже читает массив и запускает ее.
   static void SelectionSort(TrackedList a, ITracer t)
   {
     for (int i = 0; i < a.Count - 1; i++)
@@ -195,7 +189,6 @@ class Program
     TracingExtensions.EmitArray(t, a.ToArray());
     SelectionSort(a, t);
 
-    // Выводить результат в консоль не нужно: визуализация уже получила шаги.
   }
 }`;
 
@@ -207,7 +200,6 @@ using AlgoTracing;
 
 class Program
 {
-  // Пишите алгоритм в этой функции. Main ниже уже читает массив и запускает ее.
   static void SelectionSort(int[] a, ITracer t)
   {
     for (int i = 0; i < a.Length - 1; i++)
@@ -267,7 +259,6 @@ class Program
     TracingExtensions.EmitArray(t, a);
     SelectionSort(a, t);
 
-    // Выводить результат в консоль не нужно: визуализация уже получила шаги.
   }
 }`;
 
@@ -279,7 +270,6 @@ using AlgoTracing;
 
 class Program
 {
-  // Пишите алгоритм в этой функции. Main ниже уже читает массив и запускает ее.
   static void QuickSort(TrackedList a, int left, int right, ITracer t)
   {
     if (left >= right) return;
@@ -334,7 +324,6 @@ class Program
     TracingExtensions.EmitArray(t, a.ToArray());
     QuickSort(a, 0, a.Count - 1, t);
 
-    // Выводить результат в консоль не нужно: визуализация уже получила шаги.
   }
 }`;
 
@@ -346,7 +335,6 @@ using AlgoTracing;
 
 class Program
 {
-  // Пишите алгоритм в этой функции. Main ниже уже читает массив и запускает ее.
   static void QuickSort(int[] a, int left, int right, ITracer t)
   {
     if (left > right) return;
@@ -456,7 +444,6 @@ class Program
     TracingExtensions.EmitArray(t, a);
     QuickSort(a, 0, a.Length - 1, t);
 
-    // Выводить результат в консоль не нужно: визуализация уже получила шаги.
   }
 }`;
 
@@ -468,7 +455,6 @@ using AlgoTracing;
 
 class Program
 {
-  // Пишите алгоритм в этой функции. Main ниже уже читает массив и запускает ее.
   static int BinarySearch(TrackedList a, int target, ITracer t)
   {
     int l = 0, r = a.Count - 1;
@@ -517,7 +503,6 @@ class Program
     BinarySearch(a, target, t);
     TracingExtensions.EndBinarySearch(t);
 
-    // Индекс возвращается из функции; выводить его в консоль не нужно.
   }
 }`;
 
@@ -529,7 +514,6 @@ using AlgoTracing;
 
 class Program
 {
-  // Пишите алгоритм в этой функции. Main ниже уже читает массив и запускает ее.
   static int BinarySearch(int[] a, int target, ITracer t)
   {
     int l = 0, r = a.Length - 1;
@@ -589,7 +573,6 @@ class Program
     TracingExtensions.EmitArray(t, a);
 
     BinarySearch(a, target, t);
-    // Индекс возвращается из функции; выводить его в консоль не нужно.
   }
 }`;
 
@@ -638,7 +621,6 @@ class Program
     TracingExtensions.EmitArray(t, a.ToArray());
     Algorithm(a, t);
 
-    // Выводить результат в консоль не нужно: визуализация уже получила шаги.
   }
 }`;
 
@@ -661,7 +643,6 @@ class Program
     TracingExtensions.Range(t, "window", 0, 1, "active");
     TracingExtensions.ClearRange(t, "window");
 
-    // Выводить результат в консоль не нужно: визуализация уже получила шаги.
   }
 }`;
 
@@ -672,7 +653,6 @@ using AlgoTracing;
 
 class Program
 {
-  // Пишите алгоритм в этой функции. Main ниже уже читает граф и запускает ее.
   static bool Bfs(TrackedAdjacencyList adj, int start, int end, out List<int> path)
   {
     int V = adj.Count;
@@ -747,7 +727,6 @@ using AlgoTracing;
 
 class Program
 {
-  // Пишите алгоритм в этой функции. Main ниже уже читает граф и запускает ее.
   static bool Dfs(TrackedAdjacencyList adj, int start, int end, out List<int> path)
   {
     int V = adj.Count;
@@ -815,6 +794,139 @@ class Program
   }
 }`;
 
+  const sandboxArray =
+`using System;
+using System.Collections.Generic;
+using System.Text.Json;
+using AlgoTracing;
+
+class Program
+{
+  // Меняйте только эту функцию: здесь находится алгоритм для массива.
+  // TrackedList a логирует чтения, сравнения, записи и обмены.
+  // ITracer t нужен для ручных пометок: ключ, минимум, pivot, диапазон, указатели.
+  static void Algorithm(TrackedList a, ITracer t)
+  {
+    TracingExtensions.EmitArray(t, a.ToArray());
+
+    for (int i = 0; i < a.Count; i++)
+    {
+      t.Read(i);
+    }
+  }
+
+  static int[] ReadValues(out int target)
+  {
+    target = 0;
+    var text = Console.In.ReadToEnd();
+    if (string.IsNullOrWhiteSpace(text)) return Array.Empty<int>();
+    try
+    {
+      using var doc = JsonDocument.Parse(text);
+      var root = doc.RootElement;
+      if (root.TryGetProperty("target", out var t) && t.ValueKind == JsonValueKind.Number)
+        target = t.GetInt32();
+      if (root.TryGetProperty("values", out var arr) && arr.ValueKind == JsonValueKind.Array)
+      {
+        var list = new List<int>();
+        foreach (var x in arr.EnumerateArray())
+          if (x.ValueKind == JsonValueKind.Number) list.Add(x.GetInt32());
+        return list.ToArray();
+      }
+    }
+    catch { }
+    return Array.Empty<int>();
+  }
+
+  static void Main()
+  {
+    ITracer t = new JsonConsoleTracer();
+    int target;
+    int[] raw = ReadValues(out target);
+    var a = new TrackedList(raw, t);
+
+    Algorithm(a, t);
+  }
+}`;
+
+  const sandboxGraph =
+`using System;
+using System.Collections.Generic;
+using AlgoTracing;
+
+class Program
+{
+  // Меняйте только эту функцию: здесь находится алгоритм для графа.
+  // start и end нужно проверить до обращения к массивам visited/parent.
+  // Найденный маршрут записывайте в out List<int> path.
+  static bool Algorithm(TrackedAdjacencyList adj, int start, int end, out List<int> path)
+  {
+    int V = adj.Count;
+    path = new List<int>();
+
+    if (start < 0 || start >= V || end < 0 || end >= V)
+      return false;
+
+    if (start == end)
+    {
+      path.Add(start);
+      return true;
+    }
+
+    var visited = new TrackedVisited(V, adj);
+    var parent = new int[V];
+    for (int i = 0; i < V; i++) parent[i] = -1;
+
+    var q = new TrackedQueue(adj);
+    visited[start] = true;
+    q.Enqueue(start);
+
+    while (q.Count > 0)
+    {
+      int current = q.Dequeue();
+      if (current == end) break;
+
+      foreach (int next in adj[current])
+      {
+        if (!visited[next])
+        {
+          visited[next] = true;
+          parent[next] = current;
+          q.Enqueue(next);
+        }
+      }
+    }
+
+    if (!visited[end])
+      return false;
+
+    for (int cur = end; cur != -1; cur = parent[cur])
+      path.Add(cur);
+    path.Reverse();
+    return true;
+  }
+
+  static void Main()
+  {
+    ITracer t = new JsonConsoleTracer();
+    var input = Console.In.ReadToEnd();
+    int start, end;
+    string startLabel, endLabel;
+    var adj = GraphInput.Parse(input, t, out start, out end, out startLabel, out endLabel);
+    adj.GraphInit(startLabel, endLabel);
+
+    List<int> path;
+    bool found = Algorithm(adj, start, end, out path);
+    if (!found)
+    {
+      adj.NotFound();
+      return;
+    }
+
+    adj.Path(path);
+  }
+}`;
+
   window.TEMPLATES = {
     onlyFunction: insertion,
     blank,
@@ -824,6 +936,8 @@ class Program
     binary,
     bfs,
     dfs,
+    sandbox_array: sandboxArray,
+    sandbox_graph: sandboxGraph,
     demo,
     controlled: controlledQuick,
     controlled_insertion: controlledInsertion,

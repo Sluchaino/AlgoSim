@@ -1,8 +1,11 @@
 ﻿// Algorithm tabs + UI mode switching
 (function () {
   const tabs = Array.from(document.querySelectorAll('[data-algo]'));
+  const theoryPanel = document.getElementById('theory-panel');
   const arrayPanel = document.getElementById('array-panel');
   const graphPanel = document.getElementById('graph-panel');
+  const sandboxPanel = document.getElementById('sandbox-panel');
+  const executionPanel = document.querySelector('.execution-panel');
   const theoryBlocks = Array.from(document.querySelectorAll('[data-theory]'));
   const binaryOnly = Array.from(document.querySelectorAll('[data-binary-only]'));
   const shuffleBtn = document.getElementById('shuffle');
@@ -30,9 +33,7 @@
       el.classList.toggle('is-hidden', el.dataset.modeView !== currentMode);
     });
     if (modeBadge) {
-      modeBadge.textContent = currentMode === 'controlled'
-        ? 'Шаблон: ручное логирование'
-        : 'Шаблон: обычный алгоритм';
+      modeBadge.textContent = 'Шаблон алгоритма';
     }
     try { localStorage.setItem(modeStorageKey, currentMode); } catch {}
     updateLegendForAlgo(getAlgoKey());
@@ -84,6 +85,7 @@
   }
 
   function applyAlgo(algo) {
+    const isSandbox = algo === 'sandbox';
     const isGraph = algo === 'bfs' || algo === 'dfs';
     const isBinary = algo === 'binary';
     captureBaseArray();
@@ -96,8 +98,11 @@
       if (active) t.setAttribute('aria-current', 'page');
       else t.removeAttribute('aria-current');
     });
-    if (arrayPanel) arrayPanel.classList.toggle('is-hidden', isGraph);
-    if (graphPanel) graphPanel.classList.toggle('is-hidden', !isGraph);
+    if (theoryPanel) theoryPanel.classList.toggle('is-hidden', isSandbox);
+    if (sandboxPanel) sandboxPanel.classList.toggle('is-hidden', !isSandbox);
+    if (arrayPanel) arrayPanel.classList.toggle('is-hidden', isGraph || isSandbox);
+    if (graphPanel) graphPanel.classList.toggle('is-hidden', !isGraph || isSandbox);
+    if (executionPanel) executionPanel.classList.toggle('is-hidden', isSandbox);
     theoryBlocks.forEach(b => b.classList.toggle('is-hidden', b.dataset.theory !== algo));
     binaryOnly.forEach(el => el.classList.toggle('is-hidden', !isBinary));
     if (shuffleBtn) {
@@ -105,17 +110,19 @@
       shuffleBtn.title = isBinary ? 'Для бинарного поиска массив должен быть отсортирован' : '';
     }
     if (playbackControls) {
+      playbackControls.classList.toggle('is-hidden', isSandbox);
+      if (stepsPanel) stepsPanel.classList.toggle('is-hidden', isSandbox);
       const target = isGraph ? playbackAnchorGraph : playbackAnchorArray;
-      if (target && playbackControls.parentNode !== target) {
+      if (!isSandbox && target && playbackControls.parentNode !== target) {
         target.appendChild(playbackControls);
       }
-      if (target && stepsPanel && stepsPanel.parentNode !== target) {
+      if (!isSandbox && target && stepsPanel && stepsPanel.parentNode !== target) {
         target.appendChild(stepsPanel);
       }
     }
     updateLegendForAlgo(algo);
-    if (!isGraph) restoreArrayState(algo);
-    if (isBinary && window.ensureBinarySorted) window.ensureBinarySorted();
+    if (!isGraph && !isSandbox) restoreArrayState(algo);
+    if (isBinary && !isSandbox && window.ensureBinarySorted) window.ensureBinarySorted();
     captureBaseForAlgo(algo);
     currentAlgo = algo;
   }
@@ -144,6 +151,15 @@
 
   modeInputs.forEach(input => {
     input.addEventListener('change', () => applyMode(input.value));
+  });
+
+  document.querySelectorAll('[data-sandbox-template]').forEach(button => {
+    button.addEventListener('click', () => {
+      const key = button.dataset.sandboxTemplate;
+      if (window.applyEditorTemplateKey && key) {
+        window.applyEditorTemplateKey(key);
+      }
+    });
   });
 
   window.addEventListener('hashchange', () => applyAlgo(getAlgoKey()));
