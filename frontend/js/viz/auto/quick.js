@@ -25,6 +25,10 @@
     QuickSortState.sortedMarked = false;
   }
 
+  function canShowSortedMarks() {
+    return !!(window.VizScene && typeof VizScene.canShowSortedMarks === 'function' && VizScene.canShowSortedMarks());
+  }
+
   function isCurrentArraySorted() {
     if (!window.VizState || !VizState._S || !Array.isArray(VizState._S.order)) return false;
     const arr = VizState._S.order;
@@ -37,6 +41,7 @@
 
   function updateQuickSortedMarks() {
     if (!window.VizState || !VizState._S || !Array.isArray(VizState._S.order)) return;
+    if (!canShowSortedMarks()) return;
     const sortedNow = isCurrentArraySorted();
     if (!sortedNow) {
       if (QuickSortState.sortedMarked) clearQuickSortedMarks();
@@ -49,6 +54,9 @@
   }
 
   function resetQuickSortState() {
+    if (window.VizScene && typeof VizScene.setSortedMarksVisible === 'function') {
+      VizScene.setSortedMarksVisible(false);
+    }
     QuickSortState.i = null;
     QuickSortState.j = null;
     QuickSortState.pivotValue = null;
@@ -280,6 +288,38 @@
     ctx.handleGenericEvent(p);
   }
 
+  function forceCompleteQuickSort() {
+    if (!window.VizState || !VizState._S || !Array.isArray(VizState._S.order)) return false;
+    if (!window.VizScene || typeof VizScene.revealSortedArray !== 'function') return false;
+    if (!VizScene.isCurrentArraySorted || !VizScene.isCurrentArraySorted()) return false;
+
+    if (QuickSortState.pivotIndex >= 0) {
+      ctx.clearMarkAt(QuickSortState.pivotIndex, 'pivot');
+      QuickSortState.pivotIndex = -1;
+    }
+    QuickSortState.pivotValue = null;
+    QuickSortState.rangeL = null;
+    QuickSortState.rangeR = null;
+    QuickSortState.i = null;
+    QuickSortState.j = null;
+    QuickSortState.lastReadIndex = -1;
+    QuickSortState.lastReadValue = null;
+    QuickSortState.lastCompareOp = null;
+    if (window.VizRanges && VizRanges.remove) {
+      VizRanges.remove('partition');
+    }
+    clearQuickSortedMarks();
+    ctx.clearPtr('i');
+    ctx.clearPtr('j');
+
+    if (window.VizScene && typeof VizScene.setSortedMarksVisible === 'function') {
+      VizScene.setSortedMarksVisible(true);
+    }
+    const revealed = VizScene.revealSortedArray();
+    QuickSortState.sortedMarked = revealed;
+    return revealed;
+  }
+
   window.VizScene.registerAuto('quick', {
     handle: handleQuickEvent,
     reset: resetQuickSortState
@@ -289,4 +329,6 @@
     handle: handleQuickEvent,
     reset: resetQuickSortState
   });
+
+  window.VizScene.forceCompleteQuickSort = forceCompleteQuickSort;
 })();

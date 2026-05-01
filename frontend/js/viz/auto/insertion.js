@@ -11,7 +11,7 @@
     keyValue: null,
     keyOriginIndex: -1,
     compareIndex: -1,
-    sortedEnd: 0,
+    sortedEnd: -1,
     awaitingInsert: false,
     scaleMin: null,
     scaleMax: null,
@@ -68,6 +68,10 @@
     });
   }
 
+  function canShowSortedMarks() {
+    return !!(window.VizScene && typeof VizScene.canShowSortedMarks === 'function' && VizScene.canShowSortedMarks());
+  }
+
   function initScaleFromArray(arr) {
     if (!Array.isArray(arr) || arr.length === 0) {
       State.scaleMin = null;
@@ -116,11 +120,13 @@
 
   function setSortedPrefix(endIndex) {
     if (!window.VizState || !VizState._S || !VizState._S.order) return;
+    const allowSorted = canShowSortedMarks();
+    const maxIdx = Math.max(-1, Math.min(endIndex, VizState._S.order.length - 1));
     VizState._S.order.forEach((_, index) => {
       const node = VizState.nodeAtIndex(index);
       if (!node) return;
       node.classList.remove('sorted');
-      if (index <= endIndex) node.classList.add('sorted');
+      if (allowSorted && index <= maxIdx) node.classList.add('sorted');
     });
   }
 
@@ -268,11 +274,14 @@
   }
 
   function resetInsertionSortState() {
+    if (window.VizScene && typeof VizScene.setSortedMarksVisible === 'function') {
+      VizScene.setSortedMarksVisible(false);
+    }
     State.active = false;
     State.keyValue = null;
     State.keyOriginIndex = -1;
     State.compareIndex = -1;
-    State.sortedEnd = 0;
+    State.sortedEnd = -1;
     State.awaitingInsert = false;
     State.scaleMin = null;
     State.scaleMax = null;
@@ -393,19 +402,24 @@
       chip.className = 'chip';
       chip.textContent = String(v);
       if (State.active && idx === State.compareIndex) chip.classList.add('comparing');
-      else if (idx <= State.sortedEnd) chip.classList.add('sorted');
+      else if (canShowSortedMarks() && idx <= State.sortedEnd) chip.classList.add('sorted');
       chip.title = `index: ${idx}, value: ${v}`;
       box.appendChild(chip);
     });
   }
 
   function forceCompleteAllInsertions() {
+    if (!window.VizState || !VizState._S || !Array.isArray(VizState._S.order)) return false;
+    if (!window.VizScene || typeof VizScene.revealSortedArray !== 'function') return false;
+    if (!VizScene.isCurrentArraySorted || !VizScene.isCurrentArraySorted()) return false;
     if (State.active) finishKeyInsertion();
     if (window.VizState && VizState._S && Array.isArray(VizState._S.order)) {
-      State.sortedEnd = Math.max(0, VizState._S.order.length - 1);
-      setSortedPrefix(State.sortedEnd);
+      State.sortedEnd = Math.max(-1, VizState._S.order.length - 1);
     }
-    _renderChips();
+    if (typeof VizScene.setSortedMarksVisible === 'function') {
+      VizScene.setSortedMarksVisible(true);
+    }
+    return VizScene.revealSortedArray();
   }
 
   window.VizScene.registerAuto('insertion', {

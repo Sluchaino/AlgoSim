@@ -230,26 +230,40 @@
 
     const cfg = window.LEGEND_CONFIG || { auto: {}, controlled: {}, graph: {} };
 
+    function syncLegendItems(legendRoot, keys) {
+      if (!legendRoot) return;
+      const items = Array.from(legendRoot.querySelectorAll('[data-legend-item]'));
+      const itemByKey = new Map(items.map(el => [el.dataset.legendItem, el]));
+      const ordered = [];
+      const seen = new Set();
+      (Array.isArray(keys) ? keys : []).forEach(key => {
+        const item = itemByKey.get(key);
+        if (!item || seen.has(key)) return;
+        seen.add(key);
+        ordered.push(item);
+      });
+      items.forEach(el => {
+        const key = el.dataset.legendItem;
+        el.classList.toggle('is-hidden', !seen.has(key));
+      });
+      const itemsHost = legendRoot.querySelector('.legend-items');
+      if (itemsHost) {
+        ordered.forEach(el => itemsHost.appendChild(el));
+      }
+    }
+
     if (arrayLegend) {
       const keys = isSandbox
         ? ((cfg.sandbox || {}).array || [])
         : ((mode === 'controlled' ? cfg.controlled : cfg.auto)[algo] || []);
-      const items = arrayLegend.querySelectorAll('[data-legend-item]');
-      items.forEach(el => {
-        const key = el.dataset.legendItem;
-        el.classList.toggle('is-hidden', isGraph || !keys.includes(key));
-      });
+      syncLegendItems(arrayLegend, isGraph ? [] : keys);
     }
 
     if (graphLegend) {
       const keys = isSandbox
         ? ((cfg.sandbox || {}).graph || [])
         : ((cfg.graph || {})[algo] || []);
-      const items = graphLegend.querySelectorAll('[data-legend-item]');
-      items.forEach(el => {
-        const key = el.dataset.legendItem;
-        el.classList.toggle('is-hidden', !isGraph || !keys.includes(key));
-      });
+      syncLegendItems(graphLegend, isGraph ? keys : []);
     }
   }
 })();

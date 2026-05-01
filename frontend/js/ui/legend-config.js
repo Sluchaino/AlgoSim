@@ -2,15 +2,15 @@
 (function () {
   window.LEGEND_CONFIG = {
     auto: {
-      insertion: ['compare', 'swap', 'key', 'sorted'],
-      selection: ['compare', 'swap', 'min', 'sorted'],
-      quick: ['compare', 'swap', 'pivot', 'range', 'read'],
-      binary: ['range', 'mid', 'found']
+      insertion: ['compare', 'read', 'write', 'key', 'sorted'],
+      selection: ['compare', 'read', 'min', 'swap', 'sorted'],
+      quick: ['compare', 'read', 'pivot', 'range', 'swap', 'sorted'],
+      binary: ['read', 'range', 'mid', 'found']
     },
     controlled: {
-      insertion: ['compare', 'swap', 'read', 'sorted'],
-      selection: ['compare', 'swap', 'read', 'min', 'sorted'],
-      quick: ['compare', 'swap', 'read', 'pivot', 'range'],
+      insertion: ['compare', 'read', 'write', 'key', 'sorted'],
+      selection: ['compare', 'read', 'min', 'swap', 'sorted'],
+      quick: ['compare', 'read', 'pivot', 'range', 'swap', 'sorted'],
       binary: ['read', 'range', 'mid', 'found']
     },
     graph: {

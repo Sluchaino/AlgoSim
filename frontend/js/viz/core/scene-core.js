@@ -7,6 +7,7 @@
   let playbackHook = null;
   let baseDelayMs = 0;
   let seekMode = false;
+  let sortedMarksVisible = false;
   const DUR_BASE = window.__VizDUR_BASE || (window.VizDUR ? { ...VizDUR } : {
     pulse: 0.25,
     move: 0.35,
@@ -37,6 +38,44 @@
   function setRenderChips(fn) {
     renderChips = fn;
     if (window.VizScene) window.VizScene._renderChips = fn;
+  }
+
+  function canShowSortedMarks() {
+    return sortedMarksVisible;
+  }
+
+  function setSortedMarksVisible(visible) {
+    const next = !!visible;
+    if (sortedMarksVisible === next) return sortedMarksVisible;
+    sortedMarksVisible = next;
+    if (!sortedMarksVisible) {
+      clearMarks('sorted');
+      callRenderChips();
+    }
+    return sortedMarksVisible;
+  }
+
+  function isCurrentArraySorted() {
+    if (!VizState || !VizState._S || !Array.isArray(VizState._S.order)) return false;
+    const arr = VizState._S.order;
+    if (arr.length <= 1) return true;
+    for (let i = 1; i < arr.length; i++) {
+      if (arr[i - 1].value > arr[i].value) return false;
+    }
+    return true;
+  }
+
+  function revealSortedArray() {
+    if (!sortedMarksVisible) return false;
+    if (!isCurrentArraySorted()) return false;
+    clearMarks('sorted');
+    if (VizState && VizState._S && Array.isArray(VizState._S.order)) {
+      for (let i = 0; i < VizState._S.order.length; i++) {
+        setMarkAt(i, 'sorted');
+      }
+    }
+    callRenderChips();
+    return true;
   }
 
   function callRenderChips() {
@@ -168,6 +207,7 @@
     if (!Array.isArray(window.currentArray)) {
       window.currentArray = [12, 5, 8, 3, 15, 7];
     }
+    setSortedMarksVisible(false);
     if (window.VizState) {
       VizState.build(window.currentArray);
     }
@@ -181,6 +221,7 @@
     ) : [];
 
     window.currentArray = cleanArray;
+    setSortedMarksVisible(false);
 
     if (window.VizState) {
       VizState.build(cleanArray);
@@ -191,6 +232,7 @@
   }
 
   function resetAll() {
+    setSortedMarksVisible(false);
     resetters.forEach(fn => {
       try { fn(ctx); } catch {}
     });
@@ -507,6 +549,10 @@
     csArrayLiteral,
     setHighlightDuration,
     setBaseDelay,
+    setSortedMarksVisible,
+    canShowSortedMarks,
+    isCurrentArraySorted,
+    revealSortedArray,
     getSwapDurationMs,
     setPlaybackHook: (fn) => { playbackHook = fn; },
     setRenderChips,
@@ -535,6 +581,10 @@
     setAnimationSpeed,
     setPlaybackState,
     setSeekMode,
+    setSortedMarksVisible,
+    canShowSortedMarks,
+    isCurrentArraySorted,
+    revealSortedArray,
     getSwapDelayMs: () => {
       const last = window.VizScene ? window.VizScene._lastSwapDurationMs : 0;
       if (Number.isFinite(last) && last > 0) return last;

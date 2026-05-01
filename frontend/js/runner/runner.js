@@ -430,6 +430,7 @@ ${printLine}
   let stepListAutoFollow = true;
   let stepListProgrammaticScroll = false;
   let stepListProgrammaticTimer = null;
+  let suppressTailFinalize = false;
 
   const MS_MIN = 50;
   const MS_MAX = 12000;
@@ -993,9 +994,19 @@ ${printLine}
   const player = new LogPlayer((item) => processPlaybackItem(item));
 
   function finalizeTailVisualStateIfNeeded() {
+    if (suppressTailFinalize) return;
     if (timelineFinalState !== 'Completed') return;
-    if (timelineAlgo === 'insertion' && window.VizScene && typeof window.VizScene.forceCompleteAllInsertions === 'function') {
-      window.VizScene.forceCompleteAllInsertions();
+    if (!window.VizScene) return;
+    const finalizers = {
+      insertion: 'forceCompleteAllInsertions',
+      selection: 'forceCompleteSelectionSort',
+      quick: 'forceCompleteQuickSort'
+    };
+    const fnName = finalizers[timelineAlgo];
+    if (!fnName) return;
+    const fn = window.VizScene[fnName];
+    if (typeof fn === 'function') {
+      fn();
     }
   }
 
@@ -1021,9 +1032,14 @@ ${printLine}
   function seekToStep(stepIndex) {
     const total = timelineStepItems.length;
     const next = Math.max(0, Math.min(total, Number.isFinite(stepIndex) ? Math.floor(stepIndex) : 0));
-    player.pause();
-    updatePlaybackState(false);
-    resetVisualizationToTimelineStart();
+    suppressTailFinalize = true;
+    try {
+      player.pause();
+      updatePlaybackState(false);
+      resetVisualizationToTimelineStart();
+    } finally {
+      suppressTailFinalize = false;
+    }
     timelineUiFrozen = true;
     try {
       if (window.VizScene && window.VizScene.setSeekMode) window.VizScene.setSeekMode(true);
@@ -1053,8 +1069,13 @@ ${printLine}
     timelineFinalState = null;
     timelineCursor = 0;
     setStepListAutoFollow(true);
-    player.stop();
-    updatePlaybackState(false);
+    suppressTailFinalize = true;
+    try {
+      player.stop();
+      updatePlaybackState(false);
+    } finally {
+      suppressTailFinalize = false;
+    }
     renderStepTimeline();
     refreshStepCursorUi();
   }
@@ -1103,8 +1124,13 @@ ${printLine}
       seekToStep(0);
       return;
     }
-    player.stop();
-    updatePlaybackState(false);
+    suppressTailFinalize = true;
+    try {
+      player.stop();
+      updatePlaybackState(false);
+    } finally {
+      suppressTailFinalize = false;
+    }
     // Reset visualization to the initial array
     if (window.VizScene && window.VizScene.setCurrentArray) {
       const initialArray = window.getCurrentArray ? window.getCurrentArray() : [];

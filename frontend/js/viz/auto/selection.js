@@ -20,7 +20,14 @@
     });
   }
 
+  function canShowSortedMarks() {
+    return !!(window.VizScene && typeof VizScene.canShowSortedMarks === 'function' && VizScene.canShowSortedMarks());
+  }
+
   function resetSelectionSortState() {
+    if (window.VizScene && typeof VizScene.setSortedMarksVisible === 'function') {
+      VizScene.setSortedMarksVisible(false);
+    }
     SelectionSortState.outerIndex = -1;
     SelectionSortState.minIndex = -1;
     SelectionSortState.sortedEnd = -1;
@@ -40,6 +47,7 @@
 
   function updateSelectionSorted(endIndex) {
     if (!window.VizState || !VizState._S || !VizState._S.order) return;
+    if (!canShowSortedMarks()) return;
     const maxIdx = Math.max(-1, Math.min(endIndex, VizState._S.order.length - 1));
     VizState._S.order.forEach((_, idx) => {
       const node = VizState.nodeAtIndex(idx);
@@ -132,8 +140,27 @@
     ctx.handleGenericEvent(p);
   }
 
+  function forceCompleteSelectionSort() {
+    if (!window.VizState || !VizState._S || !Array.isArray(VizState._S.order)) return false;
+    if (!window.VizScene || typeof VizScene.revealSortedArray !== 'function') return false;
+    if (!VizScene.isCurrentArraySorted || !VizScene.isCurrentArraySorted()) return false;
+
+    if (window.VizScene && typeof VizScene.setSortedMarksVisible === 'function') {
+      VizScene.setSortedMarksVisible(true);
+    }
+
+    SelectionSortState.outerIndex = -1;
+    SelectionSortState.lastInnerJ = -1;
+    SelectionSortState.minIndex = -1;
+    SelectionSortState.sortedEnd = VizState._S.order.length - 1;
+    clearSelectionMarks();
+    return VizScene.revealSortedArray();
+  }
+
   window.VizScene.registerAuto('selection', {
     handle: handleSelectionEvent,
     reset: resetSelectionSortState
   });
+
+  window.VizScene.forceCompleteSelectionSort = forceCompleteSelectionSort;
 })();
