@@ -723,7 +723,9 @@ ${printLine}
       const res = resultText(p.result);
       const constRole = timelineAlgo === 'binary'
         ? 'цель'
-        : (timelineAlgo === 'quick' ? 'опорный элемент (pivot)' : 'константа');
+        : (timelineAlgo === 'quick'
+          ? 'опорный элемент (pivot)'
+          : (timelineAlgo === 'insertion' ? 'ключ' : 'константа'));
       if (Number.isInteger(p.i) && p.i >= 0 && p.j === -1) {
         return step(`Сравнение: ${elemText(p.ai)} ${op} ${constRole} (${bj}) -> ${res}.`);
       }
@@ -1290,7 +1292,9 @@ ${printLine}
 
   function parseStepPayloads(output, algoName) {
     const steps = [];
-    const isQuick = String(algoName || '').toLowerCase() === 'quick';
+    const algoKey = String(algoName || '').toLowerCase();
+    const isQuick = algoKey === 'quick';
+    const isInsertion = algoKey === 'insertion';
     const recentReads = [];
     let lastPivotValue = null;
     let lastPivotIndex = null;
@@ -1336,6 +1340,17 @@ ${printLine}
 
     function pushStep(step) {
       if (!step || typeof step !== 'object') return;
+
+      if (isInsertion) {
+        // Auto insertion sort shows shifts and writes, so raw technical
+        // compare/swap records would only duplicate the visible sequence.
+        if (step.kind === 'compare' && (step.i === -1 || step.j === -1)) {
+          return;
+        }
+        if (step.kind === 'swap') {
+          return;
+        }
+      }
 
       if (isQuick) {
         // For quick-sort with constant pivot comparisons, keep compareEx only.
