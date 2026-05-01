@@ -859,7 +859,6 @@ class Program
 {
   // Меняйте только эту функцию: здесь находится алгоритм для графа.
   // start и end нужно проверить до обращения к массивам visited/parent.
-  // Найденный маршрут записывайте в out List<int> path.
   static bool Algorithm(TrackedAdjacencyList adj, int start, int end, out List<int> path)
   {
     int V = adj.Count;
