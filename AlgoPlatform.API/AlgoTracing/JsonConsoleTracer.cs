@@ -37,6 +37,8 @@ namespace AlgoTracing
         private bool _binEqChecked;
         private bool _binEqWasTrue;
         private bool _binFound;
+        private int _binReadIndex = -1;
+        private bool _binReadSeen;
 
         public void Compare(int i, int j)
         {
@@ -50,6 +52,14 @@ namespace AlgoTracing
             _compareBj = bj;
             _compareReadI = null;
             _compareReadJ = null;
+
+            if (_binaryMode && ((i == -1 && j >= 0) || (j == -1 && i >= 0)))
+            {
+                // In binary auto mode, compareEx already carries full compare semantics.
+                // Skipping the technical compare avoids duplicate pulses/steps.
+                return;
+            }
+
             Emit(new { kind = "compare", i, j, ai, bj });
         }
 
@@ -80,6 +90,20 @@ namespace AlgoTracing
                 if (i == _compareI && !_compareReadI.HasValue) _compareReadI = v;
                 if (i == _compareJ && !_compareReadJ.HasValue) _compareReadJ = v;
             }
+
+            if (_binaryMode && _binReadSeen && _binReadIndex == i)
+            {
+                // Binary search often reads a[mid] twice in one loop iteration
+                // (for == and then < / >). Keep one read pulse per mid.
+                return;
+            }
+
+            if (_binaryMode)
+            {
+                _binReadSeen = true;
+                _binReadIndex = i;
+            }
+
             Emit(new { kind = "read", i, value = v });
         }
 
@@ -343,6 +367,8 @@ namespace AlgoTracing
             _binEqChecked = false;
             _binEqWasTrue = false;
             _binFound = false;
+            _binReadSeen = false;
+            _binReadIndex = -1;
 
             if (_binLeft <= _binRight)
             {
@@ -363,6 +389,8 @@ namespace AlgoTracing
             _binEqChecked = false;
             _binEqWasTrue = false;
             _binFound = false;
+            _binReadSeen = false;
+            _binReadIndex = -1;
         }
 
         private void HandleBinaryCompareEx(object payload)
@@ -411,6 +439,8 @@ namespace AlgoTracing
                     Emit(new { kind = "rangeClear", name = "window" });
                     Emit(new { kind = "ptrClear", name = "mid" });
                     _binFound = true;
+                    _binReadSeen = false;
+                    _binReadIndex = -1;
                     return;
                 }
             }
@@ -419,12 +449,16 @@ namespace AlgoTracing
                 if (result) _binLeft = idx + 1;
                 else if (_binEqChecked && !_binEqWasTrue) _binRight = idx - 1;
                 _binEqChecked = false;
+                _binReadSeen = false;
+                _binReadIndex = -1;
             }
             else if (op == ">")
             {
                 if (result) _binRight = idx - 1;
                 else if (_binEqChecked && !_binEqWasTrue) _binLeft = idx + 1;
                 _binEqChecked = false;
+                _binReadSeen = false;
+                _binReadIndex = -1;
             }
             else
             {
@@ -437,6 +471,8 @@ namespace AlgoTracing
                 Emit(new { kind = "ptrClear", name = "mid" });
                 Emit(new { kind = "notFound" });
                 _binaryMode = false;
+                _binReadSeen = false;
+                _binReadIndex = -1;
             }
         }
 
