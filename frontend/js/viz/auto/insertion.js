@@ -78,7 +78,8 @@
   }
 
   function canShowSortedMarks() {
-    return !!(window.VizScene && typeof VizScene.canShowSortedMarks === 'function' && VizScene.canShowSortedMarks());
+    // In insertion sort we keep sorted prefix visible progressively.
+    return true;
   }
 
   function initScaleFromArray(arr) {
@@ -305,7 +306,7 @@
 
   function resetInsertionSortState() {
     if (window.VizScene && typeof VizScene.setSortedMarksVisible === 'function') {
-      VizScene.setSortedMarksVisible(false);
+      VizScene.setSortedMarksVisible(true);
     }
     State.active = false;
     State.keyValue = null;
@@ -361,6 +362,11 @@
       if (Number.isFinite(fallbackKey)) {
         beginKey(p.from, fallbackKey);
       }
+    }
+    // When shifting from the sorted prefix, immediately keep the shifted target in green.
+    if (Number.isInteger(p.to) && p.to >= 0) {
+      State.sortedEnd = Math.max(State.sortedEnd, p.to);
+      setSortedPrefix(State.sortedEnd);
     }
     const value = Number.isFinite(p.value) ? Math.trunc(p.value) : NaN;
     animateShiftCopy(p.from, p.to, value);
@@ -445,16 +451,10 @@
 
   function forceCompleteAllInsertions() {
     if (!window.VizState || !VizState._S || !Array.isArray(VizState._S.order)) return false;
-    if (!window.VizScene || typeof VizScene.revealSortedArray !== 'function') return false;
-    if (!VizScene.isCurrentArraySorted || !VizScene.isCurrentArraySorted()) return false;
+    if (!window.VizScene || !VizScene.isCurrentArraySorted || !VizScene.isCurrentArraySorted()) return false;
     if (State.active) finishKeyInsertion();
-    if (window.VizState && VizState._S && Array.isArray(VizState._S.order)) {
-      State.sortedEnd = Math.max(-1, VizState._S.order.length - 1);
-    }
-    if (typeof VizScene.setSortedMarksVisible === 'function') {
-      VizScene.setSortedMarksVisible(true);
-    }
-    return VizScene.revealSortedArray();
+    // Keep progressive coloring as-is; no forced instant full-green reveal.
+    return true;
   }
 
   window.VizScene.registerAuto('insertion', {
