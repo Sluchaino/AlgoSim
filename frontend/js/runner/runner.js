@@ -329,6 +329,7 @@ ${printLine}
       this.processItem = processItem;
       this.processed = 0;
       this._nextDelayMs = null;
+      this.lastItemVisualMs = 0;
       this.onStateChange = null;
     }
     _notifyState() {
@@ -370,7 +371,12 @@ ${printLine}
     stepOnce() {
       if (this.queue.length === 0) return;
       const item = this.queue.shift();
-      try { this.processItem(item); } catch {}
+      try {
+        const extra = this.processItem(item);
+        this.lastItemVisualMs = (Number.isFinite(extra) && extra > 0) ? Math.round(extra) : 0;
+      } catch {
+        this.lastItemVisualMs = 0;
+      }
       this.processed++;
     }
     _scheduleNext() {
@@ -385,10 +391,13 @@ ${printLine}
         const item = this.queue.shift();
         try {
           const extra = this.processItem(item);
+          this.lastItemVisualMs = (Number.isFinite(extra) && extra > 0) ? Math.round(extra) : 0;
           if (Number.isFinite(extra) && extra > 0) {
             this._nextDelayMs = Math.max(this.delayMs, extra);
           }
-        } catch {}
+        } catch {
+          this.lastItemVisualMs = 0;
+        }
         this.processed++;
         if (this.queue.length === 0) {
           this.isPlaying = false;
@@ -994,29 +1003,52 @@ ${printLine}
   }
 
   const player = new LogPlayer((item) => processPlaybackItem(item));
+  let tailFinalizeTimer = null;
 
-  function finalizeTailVisualStateIfNeeded() {
+  function finalizeTailVisualStateIfNeeded(delayMs = 0) {
     if (suppressTailFinalize) return;
     if (timelineFinalState !== 'Completed') return;
     if (!window.VizScene) return;
-    const finalizers = {
-      insertion: 'forceCompleteAllInsertions',
-      selection: 'forceCompleteSelectionSort',
-      quick: 'forceCompleteQuickSort'
-    };
-    const fnName = finalizers[timelineAlgo];
-    if (!fnName) return;
-    const fn = window.VizScene[fnName];
-    if (typeof fn === 'function') {
-      fn();
+
+    if (tailFinalizeTimer !== null) {
+      clearTimeout(tailFinalizeTimer);
+      tailFinalizeTimer = null;
     }
+
+    const runFinalize = () => {
+      if (suppressTailFinalize) return;
+      if (timelineFinalState !== 'Completed') return;
+      if (!window.VizScene) return;
+      const finalizers = {
+        insertion: 'forceCompleteAllInsertions',
+        selection: 'forceCompleteSelectionSort',
+        quick: 'forceCompleteQuickSort'
+      };
+      const fnName = finalizers[timelineAlgo];
+      if (!fnName) return;
+      const fn = window.VizScene[fnName];
+      if (typeof fn === 'function') {
+        fn();
+      }
+    };
+
+    const wait = Math.max(0, Number.isFinite(delayMs) ? Math.round(delayMs) : 0);
+    if (wait > 0) {
+      tailFinalizeTimer = setTimeout(() => {
+        tailFinalizeTimer = null;
+        runFinalize();
+      }, wait);
+      return;
+    }
+
+    runFinalize();
   }
 
   function updatePlayPauseLabel(playing) {
     if (!btnPlayPause) return;
     btnPlayPause.textContent = playing ? 'Пауза' : 'Воспроизвести';
     if (!playing && player.queue && player.queue.length === 0) {
-      finalizeTailVisualStateIfNeeded();
+      finalizeTailVisualStateIfNeeded(player.lastItemVisualMs);
     }
   }
   player.onStateChange = updatePlayPauseLabel;
@@ -1041,6 +1073,10 @@ ${printLine}
       resetVisualizationToTimelineStart();
     } finally {
       suppressTailFinalize = false;
+      if (tailFinalizeTimer !== null) {
+        clearTimeout(tailFinalizeTimer);
+        tailFinalizeTimer = null;
+      }
     }
     timelineUiFrozen = true;
     try {
@@ -1077,6 +1113,10 @@ ${printLine}
       updatePlaybackState(false);
     } finally {
       suppressTailFinalize = false;
+      if (tailFinalizeTimer !== null) {
+        clearTimeout(tailFinalizeTimer);
+        tailFinalizeTimer = null;
+      }
     }
     renderStepTimeline();
     refreshStepCursorUi();
@@ -1132,6 +1172,10 @@ ${printLine}
       updatePlaybackState(false);
     } finally {
       suppressTailFinalize = false;
+      if (tailFinalizeTimer !== null) {
+        clearTimeout(tailFinalizeTimer);
+        tailFinalizeTimer = null;
+      }
     }
     // Reset visualization to the initial array
     if (window.VizScene && window.VizScene.setCurrentArray) {
