@@ -736,10 +736,12 @@ ${printLine}
           ? 'опорный элемент (pivot)'
           : (timelineAlgo === 'insertion' ? 'ключ' : 'константа'));
       if (Number.isInteger(p.i) && p.i >= 0 && p.j === -1) {
-        return step(`Сравнение: ${elemText(p.ai)} ${op} ${constRole} (${bj}) -> ${res}.`);
+        const right = hasNum(p.bj) ? `${constRole} (${bj})` : constRole;
+        return step(`Сравнение: ${elemText(p.ai)} ${op} ${right} -> ${res}.`);
       }
       if (p.i === -1 && Number.isInteger(p.j) && p.j >= 0) {
-        return step(`Сравнение: ${constRole} (${ai}) ${op} ${elemText(p.bj)} -> ${res}.`);
+        const left = hasNum(p.ai) ? `${constRole} (${ai})` : constRole;
+        return step(`Сравнение: ${left} ${op} ${elemText(p.bj)} -> ${res}.`);
       }
       return step(`Сравнение: ${elemText(p.ai)} ${op} ${elemText(p.bj)} -> ${res}.`);
     }
@@ -849,6 +851,38 @@ ${printLine}
     return step(`Шаг "${kind}".`);
   }
 
+  function isHiddenStepBase(payload) {
+    const p = payload && typeof payload === 'object' ? payload : {};
+    const kind = p.kind ? String(p.kind) : '';
+    if (kind === 'range' || kind === 'rangeClear' || kind === 'clearRanges') return true;
+    if (kind === 'ptr') {
+      const name = String(p.name || '').trim().toLowerCase();
+      if (name === 'mid') return true;
+    }
+    if (timelineAlgo === 'binary' && kind === 'compare' && (p.i === -1 || p.j === -1)) return true;
+    return false;
+  }
+
+  function isHiddenStepForTimeline(payload, rawIndex = -1) {
+    if (isHiddenStepBase(payload)) return true;
+    if (timelineAlgo !== 'binary' || !Number.isInteger(rawIndex) || rawIndex <= 0) return false;
+
+    const p = payload && typeof payload === 'object' ? payload : {};
+    const kind = p.kind ? String(p.kind) : '';
+    if (kind !== 'ptrClear') return false;
+
+    const name = String(p.name || 'ptr').trim().toLowerCase();
+    for (let i = rawIndex - 1; i >= 0; i--) {
+      const prev = timelineStepItems[i] && timelineStepItems[i].payload;
+      if (isHiddenStepBase(prev)) continue;
+      const prevKind = prev && prev.kind ? String(prev.kind) : '';
+      if (prevKind !== 'ptrClear') return false;
+      const prevName = String((prev && prev.name) || 'ptr').trim().toLowerCase();
+      return prevName === name;
+    }
+    return false;
+  }
+
   function setStepListAutoFollow(enabled) {
     stepListAutoFollow = !!enabled;
     if (stepList) {
@@ -889,8 +923,11 @@ ${printLine}
   function renderStepCorner() {
     if (!stepCornerEls.length) return;
 
-    const total = timelineStepItems.length;
-    const current = Math.max(0, Math.min(total, timelineCursor));
+    const total = timelineStepItems.reduce((acc, item, idx) => acc + (isHiddenStepForTimeline(item.payload, idx) ? 0 : 1), 0);
+    const cursorBound = Math.max(0, Math.min(timelineStepItems.length, timelineCursor));
+    const current = timelineStepItems
+      .slice(0, cursorBound)
+      .reduce((acc, item, idx) => acc + (isHiddenStepForTimeline(item.payload, idx) ? 0 : 1), 0);
 
     stepCornerEls.forEach((box) => {
       const curEl = box.querySelector('[data-viz-step-current]');
@@ -912,20 +949,37 @@ ${printLine}
         return;
       }
 
+      let activeRaw = cursorBound - 1;
+      while (activeRaw >= 0 && isHiddenStepForTimeline(timelineStepItems[activeRaw] && timelineStepItems[activeRaw].payload, activeRaw)) {
+        activeRaw--;
+      }
+      if (activeRaw < 0) {
+        listEl.textContent = 'Ожидание старта анимации';
+        return;
+      }
       const row = document.createElement('div');
       row.className = 'viz-steps-corner-item is-active';
-      row.textContent = formatStepLabel(timelineStepItems[current - 1].payload, current);
+      row.textContent = formatStepLabel(timelineStepItems[activeRaw].payload, current);
       listEl.appendChild(row);
     });
   }
 
   function refreshStepCursorUi() {
-    if (stepCurrentEl) stepCurrentEl.textContent = String(timelineCursor);
+    const visibleCurrent = timelineStepItems
+      .slice(0, Math.max(0, timelineCursor))
+      .reduce((acc, item, idx) => acc + (isHiddenStepForTimeline(item.payload, idx) ? 0 : 1), 0);
+    if (stepCurrentEl) stepCurrentEl.textContent = String(visibleCurrent);
     if (stepRange) stepRange.value = String(timelineCursor);
     if (stepList) {
       const prev = stepList.querySelector('.step-item.is-active');
       if (prev) prev.classList.remove('is-active');
-      const active = stepList.querySelector(`[data-step-index="${timelineCursor}"]`);
+      let activeRaw = Math.max(0, Math.min(timelineStepItems.length, timelineCursor)) - 1;
+      while (activeRaw >= 0 && isHiddenStepForTimeline(timelineStepItems[activeRaw] && timelineStepItems[activeRaw].payload, activeRaw)) {
+        activeRaw--;
+      }
+      const active = activeRaw >= 0
+        ? stepList.querySelector(`[data-step-raw-index="${activeRaw}"]`)
+        : null;
       if (active) {
         active.classList.add('is-active');
         scrollStepListToActive(active);
@@ -936,7 +990,8 @@ ${printLine}
 
   function renderStepTimeline() {
     const total = timelineStepItems.length;
-    if (stepTotalEl) stepTotalEl.textContent = String(total);
+    const visibleTotal = timelineStepItems.reduce((acc, item, idx) => acc + (isHiddenStepForTimeline(item.payload, idx) ? 0 : 1), 0);
+    if (stepTotalEl) stepTotalEl.textContent = String(visibleTotal);
     if (stepRange) {
       stepRange.min = '0';
       stepRange.max = String(total);
@@ -947,14 +1002,17 @@ ${printLine}
     stepList.innerHTML = '';
     if (total === 0) return;
     const frag = document.createDocumentFragment();
+    let visibleIdx = 0;
     for (let i = 0; i < total; i++) {
+      const payload = timelineStepItems[i] && timelineStepItems[i].payload;
+      if (isHiddenStepForTimeline(payload, i)) continue;
       const btn = document.createElement('button');
-      const idx = i + 1;
+      const idx = ++visibleIdx;
       btn.type = 'button';
       btn.className = 'step-item';
-      btn.dataset.stepIndex = String(idx);
-      btn.textContent = formatStepLabel(timelineStepItems[i].payload, idx);
-      if (idx === timelineCursor) btn.classList.add('is-active');
+      btn.dataset.stepIndex = String(i + 1);
+      btn.dataset.stepRawIndex = String(i);
+      btn.textContent = formatStepLabel(payload, idx);
       frag.appendChild(btn);
     }
     stepList.appendChild(frag);
@@ -1342,6 +1400,28 @@ ${printLine}
     const recentReads = [];
     let lastPivotValue = null;
     let lastPivotIndex = null;
+    let insertionPendingSetIndex = null;
+    let insertionPendingSetValue = null;
+
+    function isInsertionConstCompare(step) {
+      if (!step || step.kind !== 'compareEx') return false;
+      if (String(step.op || '').trim() !== '>') return false;
+      const iNum = Number.isInteger(step.i) && step.i >= 0;
+      const jNum = Number.isInteger(step.j) && step.j >= 0;
+      return (iNum && step.j === -1) || (jNum && step.i === -1);
+    }
+
+    function insertionCompareIndex(step) {
+      if (Number.isInteger(step.i) && step.i >= 0 && step.j === -1) return step.i;
+      if (Number.isInteger(step.j) && step.j >= 0 && step.i === -1) return step.j;
+      return null;
+    }
+
+    function insertionKeyValue(step) {
+      if (Number.isInteger(step.i) && step.i >= 0 && step.j === -1) return step.bj;
+      if (Number.isInteger(step.j) && step.j >= 0 && step.i === -1) return step.ai;
+      return null;
+    }
 
     function parseInnerStep(rawLine) {
       if (!rawLine) return null;
@@ -1393,6 +1473,30 @@ ${printLine}
         }
         if (step.kind === 'swap') {
           return;
+        }
+        if (step.kind === 'setArray') {
+          insertionPendingSetIndex = null;
+          insertionPendingSetValue = null;
+        }
+        if (isInsertionConstCompare(step)) {
+          const cmpIndex = insertionCompareIndex(step);
+          const keyValue = insertionKeyValue(step);
+          if (Number.isInteger(cmpIndex) && Number.isFinite(keyValue)) {
+            if (step.result === false) {
+              insertionPendingSetIndex = cmpIndex + 1;
+              insertionPendingSetValue = keyValue;
+            } else if (step.result === true && cmpIndex === 0) {
+              // j becomes -1 after shift from index 0, next expected write is key at index 0.
+              insertionPendingSetIndex = 0;
+              insertionPendingSetValue = keyValue;
+            }
+          }
+        }
+        if (step.kind === 'set' && Number.isInteger(step.i) && Number.isFinite(step.value)) {
+          if (Number.isInteger(insertionPendingSetIndex) && step.i === insertionPendingSetIndex) {
+            insertionPendingSetIndex = null;
+            insertionPendingSetValue = null;
+          }
         }
       }
 
@@ -1447,6 +1551,21 @@ ${printLine}
         log('[stderr] STEP parse error');
       }
     }
+
+    if (
+      isInsertion &&
+      Number.isInteger(insertionPendingSetIndex) &&
+      insertionPendingSetIndex >= 0 &&
+      Number.isFinite(insertionPendingSetValue)
+    ) {
+      steps.push({
+        kind: 'set',
+        i: insertionPendingSetIndex,
+        value: insertionPendingSetValue,
+        synthetic: true
+      });
+    }
+
     return steps;
   }
 
