@@ -440,6 +440,10 @@ ${printLine}
   let stepListProgrammaticScroll = false;
   let stepListProgrammaticTimer = null;
   let suppressTailFinalize = false;
+  let timelineDataVersion = 0;
+  let binaryStepListFilterCacheVersion = -1;
+  let binaryStepListFilterCacheAlgo = '';
+  let binaryStepListHiddenRaw = new Set();
 
   const MS_MIN = 50;
   const MS_MAX = 12000;
@@ -851,36 +855,119 @@ ${printLine}
     return step(`Шаг "${kind}".`);
   }
 
-  function isHiddenStepBase(payload) {
+  function stepPayloadKind(payload) {
     const p = payload && typeof payload === 'object' ? payload : {};
-    const kind = p.kind ? String(p.kind) : '';
+    return p.kind ? String(p.kind) : '';
+  }
+
+  function isHiddenStepBase(payload) {
+    const kind = stepPayloadKind(payload);
     if (kind === 'range' || kind === 'rangeClear' || kind === 'clearRanges') return true;
     if (kind === 'ptr') {
+      const p = payload && typeof payload === 'object' ? payload : {};
       const name = String(p.name || '').trim().toLowerCase();
       if (name === 'mid') return true;
     }
-    if (timelineAlgo === 'binary' && kind === 'compare' && (p.i === -1 || p.j === -1)) return true;
+    if (timelineAlgo === 'binary' && kind === 'compare') {
+      const p = payload && typeof payload === 'object' ? payload : {};
+      if (p.i === -1 || p.j === -1) return true;
+    }
     return false;
   }
 
-  function isHiddenStepForTimeline(payload, rawIndex = -1) {
-    if (isHiddenStepBase(payload)) return true;
-    if (timelineAlgo !== 'binary' || !Number.isInteger(rawIndex) || rawIndex <= 0) return false;
+  function isBinaryStepListKindAllowed(kind) {
+    return kind === 'setArray' || kind === 'binaryInit' || kind === 'read' || kind === 'compareEx';
+  }
 
-    const p = payload && typeof payload === 'object' ? payload : {};
-    const kind = p.kind ? String(p.kind) : '';
-    if (kind !== 'ptrClear') return false;
+  function getBinaryComparedIndex(payload) {
+    if (!payload || stepPayloadKind(payload) !== 'compareEx') return null;
+    const i = Number.isInteger(payload.i) ? payload.i : null;
+    const j = Number.isInteger(payload.j) ? payload.j : null;
+    if (i !== null && i >= 0 && j === -1) return i;
+    if (j !== null && j >= 0 && i === -1) return j;
+    return null;
+  }
 
-    const name = String(p.name || 'ptr').trim().toLowerCase();
-    for (let i = rawIndex - 1; i >= 0; i--) {
-      const prev = timelineStepItems[i] && timelineStepItems[i].payload;
-      if (isHiddenStepBase(prev)) continue;
-      const prevKind = prev && prev.kind ? String(prev.kind) : '';
-      if (prevKind !== 'ptrClear') return false;
-      const prevName = String((prev && prev.name) || 'ptr').trim().toLowerCase();
-      return prevName === name;
+  function invalidateBinaryStepListFilterCache() {
+    binaryStepListFilterCacheVersion = -1;
+    binaryStepListFilterCacheAlgo = '';
+    binaryStepListHiddenRaw = new Set();
+  }
+
+  function ensureBinaryStepListHiddenRaw() {
+    if (timelineAlgo !== 'binary') return;
+    if (
+      binaryStepListFilterCacheVersion === timelineDataVersion &&
+      binaryStepListFilterCacheAlgo === timelineAlgo
+    ) {
+      return;
     }
-    return false;
+
+    const hidden = new Set();
+    const allowed = [];
+
+    for (let rawIndex = 0; rawIndex < timelineStepItems.length; rawIndex++) {
+      const item = timelineStepItems[rawIndex];
+      const payload = item && item.payload ? item.payload : null;
+      const kind = stepPayloadKind(payload);
+      if (!isBinaryStepListKindAllowed(kind)) {
+        hidden.add(rawIndex);
+        continue;
+      }
+      allowed.push({ rawIndex, kind, payload });
+    }
+
+    // Hide duplicate pair:
+    // read(mid) -> compareEx(== false) -> read(mid) -> compareEx(<|>)
+    for (let idx = 0; idx <= allowed.length - 4; idx++) {
+      const a = allowed[idx];
+      const b = allowed[idx + 1];
+      const c = allowed[idx + 2];
+      const d = allowed[idx + 3];
+
+      if (a.kind !== 'read' || b.kind !== 'compareEx' || c.kind !== 'read' || d.kind !== 'compareEx') continue;
+
+      const readA = Number.isInteger(a.payload && a.payload.i) ? a.payload.i : null;
+      const readC = Number.isInteger(c.payload && c.payload.i) ? c.payload.i : null;
+      const cmpB = getBinaryComparedIndex(b.payload);
+      const cmpD = getBinaryComparedIndex(d.payload);
+      const bOp = String((b.payload && b.payload.op) || '').trim();
+      const dOp = String((d.payload && d.payload.op) || '').trim();
+      const bResultFalse = b.payload && b.payload.result === false;
+      const dIsDirectionCompare = dOp === '<' || dOp === '>' || dOp === '<=' || dOp === '>=';
+
+      if (
+        readA === null ||
+        readC === null ||
+        cmpB === null ||
+        cmpD === null ||
+        bOp !== '==' ||
+        !bResultFalse ||
+        !dIsDirectionCompare
+      ) {
+        continue;
+      }
+
+      if (readA === readC && readA === cmpB && readA === cmpD) {
+        hidden.add(a.rawIndex);
+        hidden.add(b.rawIndex);
+      }
+    }
+
+    binaryStepListHiddenRaw = hidden;
+    binaryStepListFilterCacheVersion = timelineDataVersion;
+    binaryStepListFilterCacheAlgo = timelineAlgo;
+  }
+
+  function isHiddenStepForTimeline(payload, rawIndex = -1) {
+    if (timelineAlgo === 'binary') {
+      ensureBinaryStepListHiddenRaw();
+      if (Number.isInteger(rawIndex) && rawIndex >= 0) {
+        return binaryStepListHiddenRaw.has(rawIndex);
+      }
+      return !isBinaryStepListKindAllowed(stepPayloadKind(payload));
+    }
+    return isHiddenStepBase(payload);
   }
 
   function setStepListAutoFollow(enabled) {
@@ -1164,6 +1251,8 @@ ${printLine}
     timelineAlgo = getAlgoKey();
     timelineFinalState = null;
     timelineCursor = 0;
+    timelineDataVersion++;
+    invalidateBinaryStepListFilterCache();
     setStepListAutoFollow(true);
     suppressTailFinalize = true;
     try {
@@ -1186,6 +1275,8 @@ ${printLine}
     timelineAlgo = algoName || getAlgoKey();
     timelineFinalState = normalizeStage(finalState);
     timelineCursor = 0;
+    timelineDataVersion++;
+    invalidateBinaryStepListFilterCache();
     setStepListAutoFollow(true);
     renderStepTimeline();
     refreshStepCursorUi();
