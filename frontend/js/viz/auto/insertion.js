@@ -168,9 +168,28 @@
     return { x: xs[index], y: VizCFG.CY };
   }
 
+  function valueAtIndex(index) {
+    if (!Number.isInteger(index) || index < 0) return null;
+    if (Array.isArray(window.currentArray) && index < window.currentArray.length) {
+      const v = window.currentArray[index];
+      return Number.isFinite(v) ? Math.trunc(v) : null;
+    }
+    if (window.VizState && VizState._S && Array.isArray(VizState._S.order) && index < VizState._S.order.length) {
+      const item = VizState._S.order[index];
+      if (item && Number.isFinite(item.value)) return Math.trunc(item.value);
+    }
+    return null;
+  }
+
   function animateShiftCopy(from, to, value) {
-    const fromPos = getNodeCenter(from);
-    const toPos = getNodeCenter(to);
+    let fromPos = getNodeCenter(from);
+    let toPos = getNodeCenter(to);
+    if ((!fromPos || !toPos) && window.VizState && typeof VizState.layout === 'function') {
+      // The first insertion step can arrive before initial centers are laid out.
+      VizState.layout(0);
+      fromPos = getNodeCenter(from);
+      toPos = getNodeCenter(to);
+    }
     if (!fromPos || !toPos || !window.VizState || !VizState._S) return;
 
     const srcNode = VizState.nodeAtIndex(from);
@@ -337,6 +356,12 @@
 
   function handleMove(p) {
     if (!Number.isInteger(p.from) || !Number.isInteger(p.to)) return;
+    if (!State.active) {
+      const fallbackKey = valueAtIndex(p.to);
+      if (Number.isFinite(fallbackKey)) {
+        beginKey(p.from, fallbackKey);
+      }
+    }
     const value = Number.isFinite(p.value) ? Math.trunc(p.value) : NaN;
     animateShiftCopy(p.from, p.to, value);
     return moveMs();
