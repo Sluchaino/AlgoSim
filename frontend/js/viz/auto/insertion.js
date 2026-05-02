@@ -50,12 +50,21 @@
     if (!el) return;
     const v = Number.isFinite(value) ? Math.trunc(value) : null;
     el.textContent = v === null ? 'Ключ' : `Ключ: ${v}`;
+    el.classList.remove('is-comparing');
     el.classList.add('is-visible');
+  }
+
+  function setKeyBadgeComparing(active) {
+    const el = ensureKeyBadge();
+    if (!el) return;
+    if (active) el.classList.add('is-comparing');
+    else el.classList.remove('is-comparing');
   }
 
   function hideKeyBadge() {
     const el = ensureKeyBadge();
     if (!el) return;
+    el.classList.remove('is-comparing');
     el.classList.remove('is-visible');
   }
 
@@ -258,6 +267,7 @@
     State.compareIndex = compareIndex;
     State.awaitingInsert = false;
     showKeyBadge(State.keyValue);
+    setKeyBadgeComparing(true);
   }
 
   function finishKeyInsertion() {
@@ -268,6 +278,7 @@
     State.sortedEnd = Math.max(State.sortedEnd, State.keyOriginIndex);
     State.keyOriginIndex = -1;
     State.keyValue = null;
+    setKeyBadgeComparing(false);
     hideKeyBadge();
     setSortedPrefix(State.sortedEnd);
     _renderChips();
@@ -307,18 +318,17 @@
 
     if (State.active) {
       State.compareIndex = cmpIndex;
+      setKeyBadgeComparing(true);
       if (result === false) State.awaitingInsert = true;
     } else if (Number.isInteger(cmpIndex)) {
+      setKeyBadgeComparing(false);
       // Iteration without shifts still extends sorted prefix.
       State.sortedEnd = Math.max(State.sortedEnd, cmpIndex + 1);
       setSortedPrefix(State.sortedEnd);
     }
 
     if (window.VizHL && Number.isInteger(cmpIndex)) {
-      const j = Number.isInteger(State.keyOriginIndex) && State.keyOriginIndex >= 0
-        ? Math.min(State.keyOriginIndex, cmpIndex + 1)
-        : cmpIndex + 1;
-      VizHL.pulseCompare(cmpIndex, j);
+      VizHL.pulseCompare(cmpIndex, null);
     }
 
     _renderChips();

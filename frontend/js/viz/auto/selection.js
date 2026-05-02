@@ -20,10 +20,6 @@
     });
   }
 
-  function canShowSortedMarks() {
-    return !!(window.VizScene && typeof VizScene.canShowSortedMarks === 'function' && VizScene.canShowSortedMarks());
-  }
-
   function resetSelectionSortState() {
     if (window.VizScene && typeof VizScene.setSortedMarksVisible === 'function') {
       VizScene.setSortedMarksVisible(false);
@@ -47,7 +43,6 @@
 
   function updateSelectionSorted(endIndex) {
     if (!window.VizState || !VizState._S || !VizState._S.order) return;
-    if (!canShowSortedMarks()) return;
     const maxIdx = Math.max(-1, Math.min(endIndex, VizState._S.order.length - 1));
     VizState._S.order.forEach((_, idx) => {
       const node = VizState.nodeAtIndex(idx);

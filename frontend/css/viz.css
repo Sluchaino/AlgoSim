@@ -102,6 +102,13 @@ svg { max-width: 100%; height: auto; display: block; }
   transform: translateY(0);
 }
 
+.insertion-key-badge.is-comparing {
+  border-color: #c2185b;
+  background: rgba(251, 207, 232, 0.95);
+  color: #881337;
+  box-shadow: 0 0 0 2px rgba(194, 24, 91, 0.22);
+}
+
 /* Р‘Р°Р·РѕРІС‹Рµ СЃС‚РёР»Рё РґР»СЏ СѓР·Р»РѕРІ */
 #stage .item { will-change: transform; }
 #stage .item circle {

@@ -4,13 +4,13 @@
     auto: {
       insertion: ['compare', 'read', 'write', 'key', 'sorted'],
       selection: ['compare', 'read', 'min', 'swap', 'sorted'],
-      quick: ['compare', 'read', 'pivot', 'range', 'swap', 'sorted'],
+      quick: ['compare', 'read', 'pivot', 'range', 'swap'],
       binary: ['read', 'range', 'mid', 'found']
     },
     controlled: {
       insertion: ['compare', 'read', 'write', 'key', 'sorted'],
       selection: ['compare', 'read', 'min', 'swap', 'sorted'],
-      quick: ['compare', 'read', 'pivot', 'range', 'swap', 'sorted'],
+      quick: ['compare', 'read', 'pivot', 'range', 'swap'],
       binary: ['read', 'range', 'mid', 'found']
     },
     graph: {

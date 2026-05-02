@@ -13,45 +13,8 @@
     lastReadIndex: -1,
     lastReadValue: null,
     compareToken: 0,
-    lastCompareOp: null,
-    sortedMarked: false
+    lastCompareOp: null
   };
-
-  function clearQuickSortedMarks() {
-    if (!window.VizState || !VizState._S || !Array.isArray(VizState._S.order)) return;
-    for (let i = 0; i < VizState._S.order.length; i++) {
-      ctx.clearMarkAt(i, 'sorted');
-    }
-    QuickSortState.sortedMarked = false;
-  }
-
-  function canShowSortedMarks() {
-    return !!(window.VizScene && typeof VizScene.canShowSortedMarks === 'function' && VizScene.canShowSortedMarks());
-  }
-
-  function isCurrentArraySorted() {
-    if (!window.VizState || !VizState._S || !Array.isArray(VizState._S.order)) return false;
-    const arr = VizState._S.order;
-    if (arr.length <= 1) return true;
-    for (let i = 1; i < arr.length; i++) {
-      if (arr[i - 1].value > arr[i].value) return false;
-    }
-    return true;
-  }
-
-  function updateQuickSortedMarks() {
-    if (!window.VizState || !VizState._S || !Array.isArray(VizState._S.order)) return;
-    if (!canShowSortedMarks()) return;
-    const sortedNow = isCurrentArraySorted();
-    if (!sortedNow) {
-      if (QuickSortState.sortedMarked) clearQuickSortedMarks();
-      return;
-    }
-    for (let i = 0; i < VizState._S.order.length; i++) {
-      ctx.setMarkAt(i, 'sorted');
-    }
-    QuickSortState.sortedMarked = true;
-  }
 
   function resetQuickSortState() {
     if (window.VizScene && typeof VizScene.setSortedMarksVisible === 'function') {
@@ -71,7 +34,9 @@
     if (window.VizRanges && VizRanges.remove) {
       VizRanges.remove('partition');
     }
-    clearQuickSortedMarks();
+    if (ctx.handleGenericEvent) {
+      ctx.handleGenericEvent({ kind: 'clearMarks', tag: 'sorted' });
+    }
     ctx.clearPtr('i');
     ctx.clearPtr('j');
   }
@@ -197,7 +162,6 @@
     if (p.kind === 'setArray' && Array.isArray(p.value)) {
       ctx.setCurrentArray(p.value);
       resetQuickSortState();
-      updateQuickSortedMarks();
       return;
     }
 
@@ -275,7 +239,6 @@
       if (window.VizHL) VizHL.pulseSwap(p.i, p.j);
       ctx.animateSwap(p.i, p.j);
       updateQuickPivotFromValue();
-      updateQuickSortedMarks();
       return;
     }
 
@@ -290,8 +253,6 @@
 
   function forceCompleteQuickSort() {
     if (!window.VizState || !VizState._S || !Array.isArray(VizState._S.order)) return false;
-    if (!window.VizScene || typeof VizScene.revealSortedArray !== 'function') return false;
-    if (!VizScene.isCurrentArraySorted || !VizScene.isCurrentArraySorted()) return false;
 
     if (QuickSortState.pivotIndex >= 0) {
       ctx.clearMarkAt(QuickSortState.pivotIndex, 'pivot');
@@ -308,16 +269,12 @@
     if (window.VizRanges && VizRanges.remove) {
       VizRanges.remove('partition');
     }
-    clearQuickSortedMarks();
+    if (ctx.handleGenericEvent) {
+      ctx.handleGenericEvent({ kind: 'clearMarks', tag: 'sorted' });
+    }
     ctx.clearPtr('i');
     ctx.clearPtr('j');
-
-    if (window.VizScene && typeof VizScene.setSortedMarksVisible === 'function') {
-      VizScene.setSortedMarksVisible(true);
-    }
-    const revealed = VizScene.revealSortedArray();
-    QuickSortState.sortedMarked = revealed;
-    return revealed;
+    return true;
   }
 
   window.VizScene.registerAuto('quick', {
