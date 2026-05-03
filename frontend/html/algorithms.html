@@ -609,8 +609,6 @@
         <div class="panel execution-panel">
           <h2>Запуск и сообщения</h2>
           <div class="row controls execution-controls">
-            <button id="run" class="primary">Run</button>
-            <button id="stop">Stop</button>
             <button id="export-raw-logs" disabled>Экспорт raw логов</button>
           </div>
           <div id="console" class="console" aria-live="polite"></div>
@@ -621,7 +619,13 @@
       <div class="split-resizer" id="split-resizer" role="separator" aria-orientation="vertical" aria-label="Изменить ширину редактора" tabindex="0"></div>
       <section class="split-pane split-pane-right" id="split-right">
         <div class="panel code-editor-panel">
-          <h2>Редактор кода (C#)</h2>
+          <div class="code-editor-head">
+            <h2>Редактор кода (C#)</h2>
+            <div class="code-editor-actions">
+              <button id="run" class="primary">Run</button>
+              <button id="stop">Stop</button>
+            </div>
+          </div>
           <div id="editor" aria-label="Редактор кода C#"></div>
         </div>
       </section>
