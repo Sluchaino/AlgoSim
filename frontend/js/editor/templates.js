@@ -274,9 +274,9 @@ class Program
   {
     if (left < right)
     {
-      int pivotIndex = PartitionHoare(a, left, right);
-      QuickSort(a, left, pivotIndex, t);
-      QuickSort(a, pivotIndex + 1, right, t);
+      int split = PartitionHoare(a, left, right);
+      QuickSort(a, left, split, t);
+      QuickSort(a, split + 1, right, t);
     }
   }
 
