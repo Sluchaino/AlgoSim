@@ -102,6 +102,20 @@ body.is-resizing-split .split-resizer::before {
 
 .code-editor-panel h2 {
   flex: 0 0 auto;
+  margin: 0;
+}
+
+.code-editor-head {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 12px;
+}
+
+.code-editor-actions {
+  display: inline-flex;
+  align-items: center;
+  gap: 10px;
 }
 
 .code-editor-panel #editor {
@@ -162,6 +176,19 @@ body.is-resizing-split * {
 
   .split-resizer {
     display: none;
+  }
+
+  .code-editor-head {
+    flex-wrap: wrap;
+  }
+
+  .code-editor-actions {
+    width: 100%;
+    justify-content: flex-end;
+  }
+
+  .code-editor-actions button {
+    width: auto;
   }
 
   .code-editor-panel #editor {
