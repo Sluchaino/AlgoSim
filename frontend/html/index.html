@@ -3,12 +3,113 @@
   <head>
     <meta charset="utf-8" />
     <meta name="viewport" content="width=device-width,initial-scale=1" />
-    <title>AlgoSim — платформа изучения алгоритмов</title>
+    <title>AlgoSim — визуализация алгоритмов на C#</title>
     <link rel="stylesheet" href="/css/styles.css" />
+    <style>
+      body.landing-page {
+        min-height: 100vh;
+        display: flex;
+        flex-direction: column;
+        background:
+          radial-gradient(circle at 8% 8%, rgba(37, 99, 235, 0.14), transparent 36%),
+          radial-gradient(circle at 92% 86%, rgba(14, 165, 233, 0.14), transparent 40%),
+          #f8fafc;
+      }
+
+      .landing-screen {
+        flex: 1;
+        display: flex;
+        flex-direction: column;
+        justify-content: center;
+        padding: 28px 0 42px;
+      }
+
+      .landing-shell {
+        width: 100%;
+        max-width: none;
+        margin: 0;
+        padding-inline: 24px;
+      }
+
+      .landing-hero {
+        margin: 0 auto;
+      }
+
+      .landing-eyebrow {
+        margin: 0 0 8px;
+        font-size: 12px;
+        font-weight: 700;
+        letter-spacing: 0.08em;
+        text-transform: uppercase;
+        color: #1d4ed8;
+      }
+
+      .landing-title {
+        margin-bottom: 10px;
+        font-size: clamp(30px, 5vw, 54px);
+        line-height: 1.05;
+        max-width: 980px;
+      }
+
+      .landing-lead {
+        font-size: 16px;
+        line-height: 1.45;
+        max-width: 920px;
+        margin-bottom: 18px;
+      }
+
+      .landing-cta {
+        display: flex;
+        flex-wrap: wrap;
+        gap: 10px;
+      }
+
+      .landing-btn,
+      .landing-link {
+        display: inline-flex;
+        align-items: center;
+        justify-content: center;
+        min-height: 38px;
+        padding: 0 14px;
+        border-radius: 8px;
+        border: 1px solid #cbd5e1;
+        text-decoration: none;
+        font-size: 14px;
+      }
+
+      .landing-btn {
+        background: var(--accent);
+        color: #fff;
+        border-color: var(--accent);
+      }
+
+      .landing-link {
+        background: #fff;
+        color: #0f172a;
+      }
+
+      .landing-grid {
+        margin-top: 14px;
+        display: grid;
+        grid-template-columns: repeat(auto-fit, minmax(240px, 1fr));
+        gap: 14px;
+      }
+
+      @media (max-width: 720px) {
+        .landing-shell {
+          padding-inline: 14px;
+        }
+
+        .landing-screen {
+          justify-content: flex-start;
+          padding-top: 18px;
+        }
+      }
+    </style>
   </head>
-  <body>
+  <body class="landing-page">
     <header class="topbar">
-      <div class="topbar-inner wrap">
+      <div class="topbar-inner landing-shell">
         <a class="topbar-brand" href="index.html">AlgoSim</a>
         <nav class="tabs" aria-label="Algorithms">
           <a class="tab" href="algorithms.html#insertion">Сортировка вставками</a>
@@ -17,18 +118,27 @@
           <a class="tab" href="algorithms.html#binary">Бинарный поиск</a>
           <a class="tab" href="algorithms.html#dfs">Поиск в глубину</a>
           <a class="tab" href="algorithms.html#bfs">Поиск в ширину</a>
-          <a class="tab" href="algorithms.html#sandbox">Песочница алгоритма</a>
         </nav>
       </div>
     </header>
 
-    <div class="wrap">
-      <h1>AlgoSim — платформа для изучения алгоритмов на C#</h1>
-      <p class="lead">Здесь можно писать алгоритмы на любом языке, отправлять код на выполнение и получать визуализацию структур данных. Визуализация строится после выполнения программы — без real-time зависимостей от интерфейса.</p>
+    <main class="landing-screen">
+      <section class="landing-hero landing-shell">
+        <p class="landing-eyebrow">алгоритмы • c# • визуализация шагов</p>
+        <h1 class="landing-title">AlgoSim — интерактивная платформа для отладки и визуального разбора алгоритмов</h1>
+        <p class="lead landing-lead">
+          Вы пишете алгоритм на C#, запускаете его в изолированном окружении и получаете пошаговую анимацию:
+          чтения, сравнения, обмены, движение указателей, диапазоны поиска и итоговый результат.
+        </p>
+        <div class="landing-cta">
+          <a class="landing-btn" href="algorithms.html#insertion">Открыть симулятор</a>
+          <a class="landing-link" href="algorithms.html#binary">Сразу к бинарному поиску</a>
+        </div>
+      </section>
 
-      <div class="grid">
+      <section class="landing-shell landing-grid">
         <div class="panel">
-          <h2>Что изучаем</h2>
+          <h2>Что доступно</h2>
           <ul>
             <li>Сортировка вставками</li>
             <li>Сортировка выбором</li>
@@ -37,34 +147,26 @@
             <li>Поиск в глубину (DFS)</li>
             <li>Поиск в ширину (BFS)</li>
           </ul>
-          <p class="hint">Для массивов используется TrackedList, для графов — JSON со списком смежности.</p>
+          <p class="hint">Для массивов используется TrackedList, для графов — ввод структуры графа и маршрута.</p>
         </div>
 
         <div class="panel">
-          <h2>Как работать</h2>
+          <h2>Как запускать</h2>
           <ol>
-            <li>Открой нужный алгоритм.</li>
-            <li>Настрой входные данные: массив или граф.</li>
-            <li>Напиши код с нужной сигнатурой.</li>
-            <li>Запусти выполнение и дождись результатов.</li>
-            <li>Изучай визуализацию шагов и итог.</li>
+            <li>Выберите алгоритм и задайте входные данные.</li>
+            <li>Измените шаблон кода под вашу реализацию.</li>
+            <li>Нажмите Run и дождитесь завершения этапов.</li>
+            <li>Разберите таймлайн шагов и анимацию.</li>
+            <li>При необходимости экспортируйте raw-логи выполнения.</li>
           </ol>
         </div>
 
         <div class="panel">
-          <h2>Как устроено выполнение</h2>
-          <p>Платформа разделена на API, очередь, воркер и runner. Это позволяет запускать пользовательский код изолированно и безопасно.</p>
-          <ol>
-            <li>API сохраняет отправку в базу и ставит задачу в очередь.</li>
-            <li>Воркер забирает задачу, обновляет статус и передает код в runner.</li>
-            <li>Runner выполняет код в контейнере и пишет логи.</li>
-            <li>Воркер сохраняет логи и финальный статус.</li>
-            <li>Фронтенд получает результат и строит визуализацию.</li>
-          </ol>
+          <h2>Как это работает внутри</h2>
+          <p>Запуск разделен на API, очередь сообщений, воркеры компиляции и раннер выполнения. Код исполняется в изолированном контейнере с ограничениями ресурсов, а фронтенд строит визуализацию по trace-событиям из raw-логов.</p>
+          <p class="hint">Такой пайплайн делает запуск воспроизводимым, безопасным и удобным для обучения.</p>
         </div>
-      </div>
-
-    </div>
+      </section>
+    </main>
   </body>
 </html>
-
