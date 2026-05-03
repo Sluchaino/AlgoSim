@@ -2,6 +2,7 @@
   const statusBox = document.getElementById('run-status');
   const statusText = document.getElementById('run-status-text');
   const timerEl = document.getElementById('run-timer');
+  const toggleBtn = document.getElementById('run-status-toggle');
   const stageTimeEls = {};
   const stageStepEls = {};
   const STAGES = ['Queued', 'CompileQueued', 'Compiling', 'RunQueued', 'Running', 'Completed', 'Failed', 'Cancelled'];
@@ -26,6 +27,7 @@
   let stageStart = null;
   const stageDurations = new Map();
   const stageSeen = new Set();
+  let isCollapsed = false;
 
   document.querySelectorAll('[data-stage-time]').forEach(el => {
     stageTimeEls[el.dataset.stageTime] = el;
@@ -57,6 +59,43 @@
     if (statusBox) statusBox.dataset.state = normalized;
   }
 
+  function getFocusStageForCollapsedView() {
+    if (currentStage && STAGES.includes(currentStage)) return currentStage;
+
+    for (const stage of STAGES) {
+      const el = stageStepEls[stage];
+      if (el && el.classList.contains('is-active')) return stage;
+    }
+
+    for (let i = STAGES.length - 1; i >= 0; i--) {
+      const stage = STAGES[i];
+      if (stageSeen.has(stage)) return stage;
+    }
+
+    return null;
+  }
+
+  function refreshCollapsedView() {
+    const focusStage = getFocusStageForCollapsedView();
+
+    STAGES.forEach(stage => {
+      const el = stageStepEls[stage];
+      if (!el) return;
+      const hide = isCollapsed && focusStage !== stage;
+      el.classList.toggle('is-collapsed-hidden', hide);
+    });
+
+    if (statusBox) statusBox.classList.toggle('is-collapsed', isCollapsed);
+    if (toggleBtn) {
+      toggleBtn.textContent = isCollapsed ? '▸' : '▾';
+      toggleBtn.setAttribute('aria-expanded', isCollapsed ? 'false' : 'true');
+      toggleBtn.setAttribute(
+        'aria-label',
+        isCollapsed ? 'Развернуть статус выполнения' : 'Свернуть статус выполнения'
+      );
+    }
+  }
+
   function formatStageMs(ms) {
     const secs = Math.max(0, Math.round(ms / 1000));
     return `${secs} сек`;
@@ -81,12 +120,14 @@
     Object.values(stageStepEls).forEach(el => el.classList.add('is-hidden'));
     stageSeen.clear();
     renderStageDurations();
+    refreshCollapsedView();
   }
 
   function setActiveStage(stage) {
     Object.values(stageStepEls).forEach(el => el.classList.remove('is-active'));
     const el = stageStepEls[stage];
     if (el) el.classList.add('is-active');
+    refreshCollapsedView();
   }
 
   function showStage(stage) {
@@ -94,6 +135,7 @@
     if (!el) return;
     el.classList.remove('is-hidden');
     stageSeen.add(stage);
+    refreshCollapsedView();
   }
 
   function enterStage(stage) {
@@ -128,6 +170,7 @@
       if (!stageSeen.has(stage)) showStage(stage);
     });
     renderStageDurations();
+    refreshCollapsedView();
   }
 
   function handleStatusStage(state) {
@@ -169,6 +212,15 @@
       timerId = null;
     }
   }
+
+  if (toggleBtn) {
+    toggleBtn.addEventListener('click', () => {
+      isCollapsed = !isCollapsed;
+      refreshCollapsedView();
+    });
+  }
+
+  refreshCollapsedView();
 
   window.RunStatusPanel = {
     normalizeStage,
