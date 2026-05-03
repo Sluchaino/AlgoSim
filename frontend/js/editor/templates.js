@@ -272,23 +272,31 @@ class Program
 {
   static void QuickSort(TrackedList a, int left, int right, ITracer t)
   {
-    if (left >= right) return;
-    int pivot = a[(left + right) / 2];
-    int i = left;
-    int j = right;
-    while (i <= j)
+    if (left < right)
     {
-      while (a[i] < pivot) i++;
-      while (a[j] > pivot) j--;
-      if (i <= j)
-      {
-        a.Swap(i, j);
-        i++;
-        j--;
-      }
+      int pi = PartitionHoare(a, left, right);
+      QuickSort(a, left, pi, t);
+      QuickSort(a, pi + 1, right, t);
     }
-    if (left < j) QuickSort(a, left, j, t);
-    if (i < right) QuickSort(a, i, right, t);
+  }
+
+  static int PartitionHoare(TrackedList a, int left, int right)
+  {
+    int pivot = a[(left + right) / 2];
+
+    int i = left - 1;
+    int j = right + 1;
+
+    while (true)
+    {
+      do { i++; } while (a[i] < pivot);
+      do { j--; } while (a[j] > pivot);
+
+      if (i >= j)
+        return j;
+
+      a.Swap(i, j);
+    }
   }
 
   static int[] ReadValues(out int target)
