@@ -47,7 +47,17 @@
 
   <body class="simulator-page">
     <div class="run-status" id="run-status" aria-live="polite">
-      <div class="run-status-title">Статус выполнения</div>
+      <div class="run-status-head">
+        <div class="run-status-title">Статус выполнения</div>
+        <button
+          type="button"
+          class="run-status-toggle"
+          id="run-status-toggle"
+          aria-controls="run-status-steps"
+          aria-expanded="true"
+          aria-label="Свернуть статус выполнения"
+        >▾</button>
+      </div>
       <div class="run-status-row">
         <span id="run-status-text">Ожидание</span>
       </div>
