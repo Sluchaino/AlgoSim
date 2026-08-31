@@ -14,12 +14,12 @@
       binary: ['read', 'range', 'mid', 'found']
     },
     graph: {
-      bfs: ['start', 'end', 'frontier', 'visited', 'current', 'path', 'notfound', 'edge-active', 'edge-path', 'edge-notfound'],
-      dfs: ['start', 'end', 'frontier', 'visited', 'current', 'path', 'notfound', 'edge-active', 'edge-path', 'edge-notfound']
+      bfs: ['start', 'end', 'visited', 'current', 'path', 'notfound', 'edge-active', 'edge-path', 'edge-notfound'],
+      dfs: ['start', 'end', 'visited', 'current', 'path', 'notfound', 'edge-active', 'edge-path', 'edge-notfound']
     },
     sandbox: {
       array: ['compare', 'swap', 'read', 'write', 'key', 'min', 'pivot', 'sorted', 'mid', 'found', 'range'],
-      graph: ['start', 'end', 'frontier', 'visited', 'current', 'path', 'notfound', 'edge-active', 'edge-path', 'edge-notfound']
+      graph: ['start', 'end', 'visited', 'current', 'path', 'notfound', 'edge-active', 'edge-path', 'edge-notfound']
     }
   };
 })();

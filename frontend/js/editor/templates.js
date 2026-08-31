@@ -935,23 +935,503 @@ class Program
   }
 }`;
 
+  const insertion_empty =
+`using System;
+using System.Collections.Generic;
+using System.Text.Json;
+using AlgoTracing;
+
+class Program
+{
+  static void InsertionSort(TrackedList a, ITracer t)
+  {
+  }
+
+  static int[] ReadValues(out int target)
+  {
+    target = 0;
+    var text = Console.In.ReadToEnd();
+    if (string.IsNullOrWhiteSpace(text)) return Array.Empty<int>();
+    try
+    {
+      using var doc = JsonDocument.Parse(text);
+      var root = doc.RootElement;
+      if (root.TryGetProperty("target", out var t) && t.ValueKind == JsonValueKind.Number)
+        target = t.GetInt32();
+      if (root.TryGetProperty("values", out var arr) && arr.ValueKind == JsonValueKind.Array)
+      {
+        var list = new List<int>();
+        foreach (var x in arr.EnumerateArray())
+          if (x.ValueKind == JsonValueKind.Number) list.Add(x.GetInt32());
+        return list.ToArray();
+      }
+    }
+    catch { }
+    return Array.Empty<int>();
+  }
+
+  static void Main()
+  {
+    ITracer t = new JsonConsoleTracer();
+    int target;
+    int[] raw = ReadValues(out target);
+    var a = new TrackedList(raw, t);
+
+    TracingExtensions.EmitArray(t, a.ToArray());
+    InsertionSort(a, t);
+
+  }
+}`;
+
+  const selection_empty =
+`using System;
+using System.Collections.Generic;
+using System.Text.Json;
+using AlgoTracing;
+
+class Program
+{
+  static void SelectionSort(TrackedList a, ITracer t)
+  {
+  }
+
+  static int[] ReadValues(out int target)
+  {
+    target = 0;
+    var text = Console.In.ReadToEnd();
+    if (string.IsNullOrWhiteSpace(text)) return Array.Empty<int>();
+    try
+    {
+      using var doc = JsonDocument.Parse(text);
+      var root = doc.RootElement;
+      if (root.TryGetProperty("target", out var t) && t.ValueKind == JsonValueKind.Number)
+        target = t.GetInt32();
+      if (root.TryGetProperty("values", out var arr) && arr.ValueKind == JsonValueKind.Array)
+      {
+        var list = new List<int>();
+        foreach (var x in arr.EnumerateArray())
+          if (x.ValueKind == JsonValueKind.Number) list.Add(x.GetInt32());
+        return list.ToArray();
+      }
+    }
+    catch { }
+    return Array.Empty<int>();
+  }
+
+  static void Main()
+  {
+    ITracer t = new JsonConsoleTracer();
+    int target;
+    int[] raw = ReadValues(out target);
+    var a = new TrackedList(raw, t);
+
+    TracingExtensions.EmitArray(t, a.ToArray());
+    SelectionSort(a, t);
+
+  }
+}`;
+
+  const quick_empty =
+`using System;
+using System.Collections.Generic;
+using System.Text.Json;
+using AlgoTracing;
+
+class Program
+{
+  static void QuickSort(TrackedList a, int left, int right, ITracer t)
+  {
+  }
+
+  static int PartitionHoare(TrackedList a, int left, int right)
+  {
+    int pivot = a[(left + right) / 2];
+
+    int i = left - 1;
+    int j = right + 1;
+
+    while (true)
+    {
+      do { i++; } while (a[i] < pivot);
+      do { j--; } while (a[j] > pivot);
+
+      if (i >= j)
+        return j;
+
+      a.Swap(i, j);
+    }
+  }
+
+  static int[] ReadValues(out int target)
+  {
+    target = 0;
+    var text = Console.In.ReadToEnd();
+    if (string.IsNullOrWhiteSpace(text)) return Array.Empty<int>();
+    try
+    {
+      using var doc = JsonDocument.Parse(text);
+      var root = doc.RootElement;
+      if (root.TryGetProperty("target", out var t) && t.ValueKind == JsonValueKind.Number)
+        target = t.GetInt32();
+      if (root.TryGetProperty("values", out var arr) && arr.ValueKind == JsonValueKind.Array)
+      {
+        var list = new List<int>();
+        foreach (var x in arr.EnumerateArray())
+          if (x.ValueKind == JsonValueKind.Number) list.Add(x.GetInt32());
+        return list.ToArray();
+      }
+    }
+    catch { }
+    return Array.Empty<int>();
+  }
+
+  static void Main()
+  {
+    ITracer t = new JsonConsoleTracer();
+    int target;
+    int[] raw = ReadValues(out target);
+    var a = new TrackedList(raw, t);
+
+    TracingExtensions.EmitArray(t, a.ToArray());
+    QuickSort(a, 0, a.Count - 1, t);
+
+  }
+}`;
+
+  const binary_empty =
+`using System;
+using System.Collections.Generic;
+using System.Text.Json;
+using AlgoTracing;
+
+class Program
+{
+  static int BinarySearch(TrackedList a, int target, ITracer t)
+  {
+    return -1;
+  }
+
+  static int[] ReadValues(out int target)
+  {
+    target = 0;
+    var text = Console.In.ReadToEnd();
+    if (string.IsNullOrWhiteSpace(text)) return Array.Empty<int>();
+    try
+    {
+      using var doc = JsonDocument.Parse(text);
+      var root = doc.RootElement;
+      if (root.TryGetProperty("target", out var t) && t.ValueKind == JsonValueKind.Number)
+        target = t.GetInt32();
+      if (root.TryGetProperty("values", out var arr) && arr.ValueKind == JsonValueKind.Array)
+      {
+        var list = new List<int>();
+        foreach (var x in arr.EnumerateArray())
+          if (x.ValueKind == JsonValueKind.Number) list.Add(x.GetInt32());
+        return list.ToArray();
+      }
+    }
+    catch { }
+    return Array.Empty<int>();
+  }
+
+  static void Main()
+  {
+    ITracer t = new JsonConsoleTracer();
+    int target;
+    int[] raw = ReadValues(out target);
+    var a = new TrackedList(raw, t);
+
+    TracingExtensions.EmitArray(t, a.ToArray());
+    TracingExtensions.BeginBinarySearch(t, a.Count, target);
+    BinarySearch(a, target, t);
+    TracingExtensions.EndBinarySearch(t);
+
+  }
+}`;
+
+  const bfs_empty =
+`using System;
+using System.Collections.Generic;
+using AlgoTracing;
+
+class Program
+{
+  static bool Bfs(TrackedAdjacencyList adj, int start, int end, out List<int> path)
+  {
+    path = new List<int>();
+    return false;
+  }
+
+  static void Main()
+  {
+    ITracer t = new JsonConsoleTracer();
+    var input = Console.In.ReadToEnd();
+    int start, end;
+    string startLabel, endLabel;
+    var adj = GraphInput.Parse(input, t, out start, out end, out startLabel, out endLabel);
+    adj.GraphInit(startLabel, endLabel);
+
+    List<int> path;
+    var found = Bfs(adj, start, end, out path);
+    if (!found)
+    {
+      adj.NotFound();
+      return;
+    }
+
+    adj.Path(path);
+  }
+}`;
+
+  const dfs_empty =
+`using System;
+using System.Collections.Generic;
+using AlgoTracing;
+
+class Program
+{
+  static bool Dfs(TrackedAdjacencyList adj, int start, int end, out List<int> path)
+  {
+    path = new List<int>();
+    return false;
+  }
+
+  static void Main()
+  {
+    ITracer t = new JsonConsoleTracer();
+    var input = Console.In.ReadToEnd();
+    int start, end;
+    string startLabel, endLabel;
+    var adj = GraphInput.Parse(input, t, out start, out end, out startLabel, out endLabel);
+    adj.GraphInit(startLabel, endLabel);
+
+    List<int> path;
+    bool found = Dfs(adj, start, end, out path);
+    if (!found)
+    {
+      adj.NotFound();
+      return;
+    }
+
+    adj.Path(path);
+  }
+}`;
+
+  const controlledInsertion_empty =
+`using System;
+using System.Collections.Generic;
+using System.Text.Json;
+using AlgoTracing;
+
+class Program
+{
+  static void InsertionSort(int[] a, ITracer t)
+  {
+  }
+
+  static int[] ReadValues(out int target)
+  {
+    target = 0;
+    var text = Console.In.ReadToEnd();
+    if (string.IsNullOrWhiteSpace(text)) return Array.Empty<int>();
+    try
+    {
+      using var doc = JsonDocument.Parse(text);
+      var root = doc.RootElement;
+      if (root.TryGetProperty("target", out var t) && t.ValueKind == JsonValueKind.Number)
+        target = t.GetInt32();
+      if (root.TryGetProperty("values", out var arr) && arr.ValueKind == JsonValueKind.Array)
+      {
+        var list = new List<int>();
+        foreach (var x in arr.EnumerateArray())
+          if (x.ValueKind == JsonValueKind.Number) list.Add(x.GetInt32());
+        return list.ToArray();
+      }
+    }
+    catch { }
+    return Array.Empty<int>();
+  }
+
+  static void Main()
+  {
+    ITracer t = new JsonConsoleTracer();
+    int target;
+    int[] a = ReadValues(out target);
+
+    TracingExtensions.EmitArray(t, a);
+    InsertionSort(a, t);
+
+  }
+}`;
+
+  const controlledSelection_empty =
+`using System;
+using System.Collections.Generic;
+using System.Text.Json;
+using AlgoTracing;
+
+class Program
+{
+  static void SelectionSort(int[] a, ITracer t)
+  {
+  }
+
+  static int[] ReadValues(out int target)
+  {
+    target = 0;
+    var text = Console.In.ReadToEnd();
+    if (string.IsNullOrWhiteSpace(text)) return Array.Empty<int>();
+    try
+    {
+      using var doc = JsonDocument.Parse(text);
+      var root = doc.RootElement;
+      if (root.TryGetProperty("target", out var t) && t.ValueKind == JsonValueKind.Number)
+        target = t.GetInt32();
+      if (root.TryGetProperty("values", out var arr) && arr.ValueKind == JsonValueKind.Array)
+      {
+        var list = new List<int>();
+        foreach (var x in arr.EnumerateArray())
+          if (x.ValueKind == JsonValueKind.Number) list.Add(x.GetInt32());
+        return list.ToArray();
+      }
+    }
+    catch { }
+    return Array.Empty<int>();
+  }
+
+  static void Main()
+  {
+    ITracer t = new JsonConsoleTracer();
+    int target;
+    int[] a = ReadValues(out target);
+
+    TracingExtensions.EmitArray(t, a);
+    SelectionSort(a, t);
+
+  }
+}`;
+
+  const controlledQuick_empty =
+`using System;
+using System.Collections.Generic;
+using System.Text.Json;
+using AlgoTracing;
+
+class Program
+{
+  static void QuickSort(int[] a, int left, int right, ITracer t)
+  {
+  }
+
+  static int[] ReadValues(out int target)
+  {
+    target = 0;
+    var text = Console.In.ReadToEnd();
+    if (string.IsNullOrWhiteSpace(text)) return Array.Empty<int>();
+    try
+    {
+      using var doc = JsonDocument.Parse(text);
+      var root = doc.RootElement;
+      if (root.TryGetProperty("target", out var t) && t.ValueKind == JsonValueKind.Number)
+        target = t.GetInt32();
+      if (root.TryGetProperty("values", out var arr) && arr.ValueKind == JsonValueKind.Array)
+      {
+        var list = new List<int>();
+        foreach (var x in arr.EnumerateArray())
+          if (x.ValueKind == JsonValueKind.Number) list.Add(x.GetInt32());
+        return list.ToArray();
+      }
+    }
+    catch { }
+    return Array.Empty<int>();
+  }
+
+  static void Main()
+  {
+    ITracer t = new JsonConsoleTracer();
+    int target;
+    int[] a = ReadValues(out target);
+
+    TracingExtensions.EmitArray(t, a);
+    QuickSort(a, 0, a.Length - 1, t);
+
+  }
+}`;
+
+  const controlledBinary_empty =
+`using System;
+using System.Collections.Generic;
+using System.Text.Json;
+using AlgoTracing;
+
+class Program
+{
+  static int BinarySearch(int[] a, int target, ITracer t)
+  {
+    return -1;
+  }
+
+  static int[] ReadValues(out int target)
+  {
+    target = 0;
+    var text = Console.In.ReadToEnd();
+    if (string.IsNullOrWhiteSpace(text)) return Array.Empty<int>();
+    try
+    {
+      using var doc = JsonDocument.Parse(text);
+      var root = doc.RootElement;
+      if (root.TryGetProperty("target", out var t) && t.ValueKind == JsonValueKind.Number)
+        target = t.GetInt32();
+      if (root.TryGetProperty("values", out var arr) && arr.ValueKind == JsonValueKind.Array)
+      {
+        var list = new List<int>();
+        foreach (var x in arr.EnumerateArray())
+          if (x.ValueKind == JsonValueKind.Number) list.Add(x.GetInt32());
+        return list.ToArray();
+      }
+    }
+    catch { }
+    return Array.Empty<int>();
+  }
+
+  static void Main()
+  {
+    ITracer t = new JsonConsoleTracer();
+    int target;
+    int[] a = ReadValues(out target);
+    TracingExtensions.EmitArray(t, a);
+
+    BinarySearch(a, target, t);
+  }
+}`;
+
   window.TEMPLATES = {
     onlyFunction: insertion,
     blank,
     insertion,
+    insertion_empty,
     selection,
+    selection_empty,
     quick,
+    quick_empty,
     binary,
+    binary_empty,
     bfs,
+    bfs_empty,
     dfs,
+    dfs_empty,
     sandbox_array: sandboxArray,
     sandbox_graph: sandboxGraph,
     demo,
     controlled: controlledQuick,
     controlled_insertion: controlledInsertion,
+    controlled_insertion_empty: controlledInsertion_empty,
     controlled_selection: controlledSelection,
+    controlled_selection_empty: controlledSelection_empty,
     controlled_quick: controlledQuick,
+    controlled_quick_empty: controlledQuick_empty,
     controlled_binary: controlledBinary,
+    controlled_binary_empty: controlledBinary_empty,
     controlled_bfs: bfs,
     controlled_dfs: dfs
   };

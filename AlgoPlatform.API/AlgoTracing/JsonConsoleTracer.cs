@@ -55,8 +55,6 @@ namespace AlgoTracing
 
             if (_binaryMode && ((i == -1 && j >= 0) || (j == -1 && i >= 0)))
             {
-                // In binary auto mode, compareEx already carries full compare semantics.
-                // Skipping the technical compare avoids duplicate pulses/steps.
                 return;
             }
 
@@ -76,7 +74,6 @@ namespace AlgoTracing
             _lastRead = null;
             ClearCompareContext();
 
-            // В той же строке отдаём массив после обмена
             Emit(new { kind = "swap", i, j, ai, bj, after = _arr.ToArray() });
         }
 
@@ -93,8 +90,6 @@ namespace AlgoTracing
 
             if (_binaryMode && _binReadSeen && _binReadIndex == i)
             {
-                // Binary search often reads a[mid] twice in one loop iteration
-                // (for == and then < / >). Keep one read pulse per mid.
                 return;
             }
 
