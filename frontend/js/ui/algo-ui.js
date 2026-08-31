@@ -205,6 +205,11 @@
       if (getAlgoKey() === 'sandbox') {
         applyAlgo('sandbox');
       }
+      // Reset show answer button
+      const showAnswerBtn = document.getElementById('show-answer');
+      if (showAnswerBtn) {
+        showAnswerBtn.disabled = false;
+      }
     });
   });
 
