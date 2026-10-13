@@ -41,10 +41,14 @@
       return sandboxKind === 'graph' ? 'sandbox_graph' : 'sandbox_array';
     }
     if (mode === 'controlled') {
-      const specific = `controlled_${safeAlgo}`;
+      const specific = `controlled_${safeAlgo}_empty`;
       if (window.TEMPLATES && window.TEMPLATES[specific]) return specific;
+      const specificFull = `controlled_${safeAlgo}`;
+      if (window.TEMPLATES && window.TEMPLATES[specificFull]) return specificFull;
       if (window.TEMPLATES && window.TEMPLATES.controlled) return 'controlled';
     }
+    const emptyKey = `${safeAlgo}_empty`;
+    if (window.TEMPLATES && window.TEMPLATES[emptyKey]) return emptyKey;
     if (window.TEMPLATES && window.TEMPLATES[safeAlgo]) return safeAlgo;
     return 'insertion';
   }
@@ -89,11 +93,49 @@
       setStatus('Idle');
     }
     lastAlgoForTimeline = nextAlgo;
+    // Reset show answer button
+    const showAnswerBtn = document.getElementById('show-answer');
+    if (showAnswerBtn) {
+      showAnswerBtn.disabled = false;
+    }
   });
   const modeInputs = Array.from(document.querySelectorAll('input[name="algo-mode"]'));
   modeInputs.forEach(input => {
-    input.addEventListener('change', () => applyTemplateFromContext());
+    input.addEventListener('change', () => {
+      applyTemplateFromContext();
+      const showAnswerBtn = document.getElementById('show-answer');
+      if (showAnswerBtn) {
+        showAnswerBtn.disabled = false;
+      }
+    });
   });
+
+  // Show Answer button handler
+  const showAnswerBtn = document.getElementById('show-answer');
+  if (showAnswerBtn) {
+    showAnswerBtn.addEventListener('click', () => {
+      const algo = getAlgoKey();
+      const mode = getModeKey();
+      let fullKey;
+      
+      if (algo === 'sandbox') {
+        const sandboxKind = window.getSandboxKind ? window.getSandboxKind() : 'array';
+        fullKey = sandboxKind === 'graph' ? 'sandbox_graph' : 'sandbox_array';
+      } else if (mode === 'controlled') {
+        fullKey = `controlled_${algo}`;
+        if (!window.TEMPLATES || !window.TEMPLATES[fullKey]) {
+          fullKey = 'controlled';
+        }
+      } else {
+        fullKey = algo;
+      }
+      
+      if (window.applyEditorTemplateKey && fullKey) {
+        window.applyEditorTemplateKey(fullKey);
+        showAnswerBtn.disabled = true;
+      }
+    });
+  }
 
   // ---------- Cleanup: strip usings/namespaces and normalize function ----------
   function stripUsingsAndNamespaces(text) {
