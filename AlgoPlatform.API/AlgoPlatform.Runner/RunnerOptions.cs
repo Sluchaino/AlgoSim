@@ -2,7 +2,7 @@ namespace AlgoPlatform.Runner
 {
     public sealed class RunnerOptions
     {
-        public int TimeoutSeconds { get; set; } = 120;
+        public int TimeoutSeconds { get; set; } = 25;
         public int MaxOutputChars { get; set; } = 200_000;
         public double CpuLimit { get; set; } = 0.5;
         public int MemoryMb { get; set; } = 256;

@@ -69,6 +69,7 @@ services:
     environment:
       ASPNETCORE_URLS: http://0.0.0.0:5291
       Runner__ContainerRuntime: ${Runner__ContainerRuntime:-runsc}
+      Runner__TimeoutSeconds: ${Runner__TimeoutSeconds:-25}
       Runner__HeartbeatIntervalSeconds: ${Runner__HeartbeatIntervalSeconds:-2}
       AWS_ACCESS_KEY_ID: ${AWS_ACCESS_KEY_ID:?Set AWS_ACCESS_KEY_ID in .env}
       AWS_SECRET_ACCESS_KEY: ${AWS_SECRET_ACCESS_KEY:?Set AWS_SECRET_ACCESS_KEY in .env}
